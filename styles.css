@@ -163,6 +163,31 @@ button { color: inherit; }
 .weight-input-wrap span { color: var(--muted); font-size: 14px; }
 .weight-input-wrap.compact { width: 185px; height: 52px; }
 .weight-input-wrap.compact input { font-size: 21px; }
+.shell-toggle {
+  width: 100%;
+  margin-top: 13px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: #fbfcf8;
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+.shell-toggle.selected { border-color: #c98954; background: #fff7ef; box-shadow: inset 0 0 0 1px #c98954; }
+.shell-toggle-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: #f4e4d3; color: #a46531; font-size: 19px; }
+.shell-toggle-copy strong, .shell-toggle-copy small { display: block; }
+.shell-toggle-copy strong { font-size: 13px; }
+.shell-toggle-copy small { margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.35; }
+.shell-toggle-state { color: var(--muted); font-size: 10px; font-weight: 750; }
+.shell-toggle.selected .shell-toggle-state { color: #a46531; }
+.shell-fields { padding: 0 2px; }
+.shell-fields .field-label { margin-top: 14px; }
+.shell-weight-wrap { background: #fffaf5; }
+.shell-help { margin: 7px 2px 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .type-fieldset { margin: 0; padding: 0; border: 0; }
 .type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .type-option {
@@ -233,6 +258,7 @@ button { color: inherit; }
 .record-weight span { color: var(--muted); font-size: 10px; }
 .record-actions { grid-column: 2 / -1; display: flex; justify-content: flex-end; gap: 6px; margin-top: -2px; }
 .mini-button { padding: 5px 8px; border: 0; border-radius: 8px; background: #eef3ed; color: #65736d; font-size: 10px; cursor: pointer; }
+.mini-button.shell-action { background: #fff1df; color: #9b5d2c; font-weight: 750; }
 .mini-button.delete { background: #fff0ed; color: #a24d3e; }
 .empty-state { padding: 28px 10px 10px; text-align: center; color: var(--muted); }
 .empty-state.hidden { display: none; }

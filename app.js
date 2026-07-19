@@ -26,6 +26,7 @@
   let currentDate = todayString();
   let selectedType = "solid";
   let editingId = null;
+  let shellMode = false;
   let deferredInstallPrompt = null;
   let toastTimer = null;
 
@@ -39,14 +40,24 @@
         limit: Number.isFinite(limit) && limit > 0 ? Math.min(limit, 9999) : 650,
         records: parsed.records
           .filter((record) => record && RULES[record.type] && Number(record.actual) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(record.date))
-          .map((record) => ({
-            id: String(record.id || `${Date.now()}-${Math.random()}`),
-            date: record.date,
-            name: String(record.name || "").slice(0, 30),
-            type: record.type,
-            actual: roundWeight(record.actual),
-            createdAt: Number(record.createdAt) || Date.now()
-          }))
+          .map((record) => {
+            const actual = roundWeight(record.actual);
+            const hasShell = Boolean(record.hasShell);
+            const shellValue = Number(record.shell);
+            const shell = hasShell && Number.isFinite(shellValue) && shellValue > 0 && shellValue < actual
+              ? roundWeight(shellValue)
+              : null;
+            return {
+              id: String(record.id || `${Date.now()}-${Math.random()}`),
+              date: record.date,
+              name: String(record.name || "").slice(0, 30),
+              type: record.type,
+              actual,
+              hasShell,
+              shell,
+              createdAt: Number(record.createdAt) || Date.now()
+            };
+          })
       };
     } catch {
       return fallback;
@@ -57,8 +68,12 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
+  function netWeight(record) {
+    return roundWeight(Math.max(0, record.actual - (record.hasShell && record.shell ? record.shell : 0)));
+  }
+
   function effectiveWeight(record) {
-    return roundWeight(record.actual * RULES[record.type].factor);
+    return roundWeight(netWeight(record) * RULES[record.type].factor);
   }
 
   function recordsFor(date) {
@@ -71,7 +86,7 @@
     const records = recordsFor(date);
     return {
       records,
-      actual: roundWeight(records.reduce((sum, record) => sum + record.actual, 0)),
+      actual: roundWeight(records.reduce((sum, record) => sum + netWeight(record), 0)),
       effective: roundWeight(records.reduce((sum, record) => sum + effectiveWeight(record), 0))
     };
   }
@@ -128,22 +143,33 @@
 
   function renderRecords() {
     const { records, actual } = totalsFor(currentDate);
+    const pendingShellCount = records.filter((record) => record.hasShell && !record.shell).length;
     el("recordsTitle").textContent = `${records.length} 条记录`;
-    el("actualTotal").textContent = `实际共 ${formatWeight(actual)} 克`;
+    el("actualTotal").textContent = pendingShellCount
+      ? `净重暂计 ${formatWeight(actual)} 克`
+      : `净重共 ${formatWeight(actual)} 克`;
     el("recordsEmpty").classList.toggle("hidden", records.length > 0);
     el("recordsList").innerHTML = records.map((record) => {
       const rule = RULES[record.type];
       const safeName = escapeHTML(record.name || rule.label);
       const time = new Date(record.createdAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+      const pendingShell = record.hasShell && !record.shell;
+      const net = netWeight(record);
+      const detail = record.hasShell
+        ? (pendingShell
+          ? `${rule.label} · 带壳 ${formatWeight(record.actual)}g · 待补壳重 · ${time}`
+          : `${rule.label} · 带壳 ${formatWeight(record.actual)}g - 壳 ${formatWeight(record.shell)}g = 净重 ${formatWeight(net)}g · ${time}`)
+        : `${rule.label} · 净重 ${formatWeight(net)}g · ${time}`;
       return `
         <article class="record-item">
           <div class="record-icon" aria-hidden="true">${rule.symbol}</div>
           <div class="record-copy">
             <strong>${safeName}</strong>
-            <span>${rule.label} · 实际 ${formatWeight(record.actual)}g · ${time}</span>
+            <span>${detail}</span>
           </div>
-          <div class="record-weight"><strong>${formatWeight(effectiveWeight(record))}g</strong><span>计入重量</span></div>
+          <div class="record-weight"><strong>${formatWeight(effectiveWeight(record))}g</strong><span>${pendingShell ? "暂计重量" : "计入重量"}</span></div>
           <div class="record-actions">
+            ${record.hasShell ? `<button class="mini-button shell-action" type="button" data-action="shell" data-id="${escapeHTML(record.id)}">${pendingShell ? "补壳重" : "改壳重"}</button>` : ""}
             <button class="mini-button" type="button" data-action="edit" data-id="${escapeHTML(record.id)}">修改</button>
             <button class="mini-button delete" type="button" data-action="delete" data-id="${escapeHTML(record.id)}">删除</button>
           </div>
@@ -188,7 +214,28 @@
 
   function updatePreview() {
     const actual = Number(el("actualWeight").value) || 0;
-    el("calculatedWeight").textContent = `${formatWeight(actual * RULES[selectedType].factor)} 克`;
+    const shell = shellMode ? (Number(el("shellWeight").value) || 0) : 0;
+    const net = Math.max(0, actual - shell);
+    if (shellMode && shell > 0) {
+      el("calculationLabel").textContent = `净重 ${formatWeight(net)} 克 · 本次计入`;
+    } else if (shellMode) {
+      el("calculationLabel").textContent = "待补壳重 · 暂时计入";
+    } else {
+      el("calculationLabel").textContent = "本次计入";
+    }
+    el("calculatedWeight").textContent = `${formatWeight(net * RULES[selectedType].factor)} 克`;
+  }
+
+  function setShellMode(enabled) {
+    shellMode = Boolean(enabled);
+    el("shellToggle").classList.toggle("selected", shellMode);
+    el("shellToggle").setAttribute("aria-pressed", String(shellMode));
+    el("shellToggleState").textContent = shellMode ? "已开启" : "未开启";
+    el("shellFields").classList.toggle("hidden", !shellMode);
+    el("shellWeight").disabled = !shellMode;
+    el("actualWeightLabel").textContent = shellMode ? "带壳重量" : "实际重量";
+    if (!shellMode) el("shellWeight").value = "";
+    updatePreview();
   }
 
   function selectType(type) {
@@ -210,13 +257,22 @@
       el("formMessage").textContent = "单条记录最多 9999 克，请检查输入。";
       return;
     }
+    const shellInput = el("shellWeight").value.trim();
+    const shell = shellMode && shellInput ? Number(shellInput) : null;
+    if (shellMode && shell !== null && (!Number.isFinite(shell) || shell <= 0 || shell >= actual)) {
+      el("formMessage").textContent = "壳的重量必须大于 0，并且小于带壳重量。";
+      el("shellWeight").focus();
+      return;
+    }
     if (editingId) {
       const record = state.records.find((item) => item.id === editingId);
       if (record) {
         record.actual = roundWeight(actual);
         record.type = selectedType;
+        record.hasShell = shellMode;
+        record.shell = shellMode && shell !== null ? roundWeight(shell) : null;
       }
-      showToast("记录已修改");
+      showToast(shellMode && shell !== null ? "壳重已保存，净重已重算" : "记录已修改");
     } else {
       state.records.push({
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -224,9 +280,11 @@
         name: "",
         type: selectedType,
         actual: roundWeight(actual),
+        hasShell: shellMode,
+        shell: shellMode && shell !== null ? roundWeight(shell) : null,
         createdAt: Date.now()
       });
-      showToast("已记下，继续保持");
+      showToast(shellMode && shell === null ? "已记录带壳重量，吃完后补壳重" : "已记下，继续保持");
     }
     saveState();
     resetForm();
@@ -240,19 +298,23 @@
     el("formTitle").textContent = "记录本次重量";
     el("saveEntryButton").textContent = "记下这餐";
     el("cancelEditButton").classList.add("hidden");
+    setShellMode(false);
     selectType("solid");
   }
 
-  function editRecord(id) {
+  function editRecord(id, focusShell = false) {
     const record = state.records.find((item) => item.id === id);
     if (!record) return;
     editingId = record.id;
     el("actualWeight").value = String(record.actual);
-    el("formTitle").textContent = "修改这条记录";
-    el("saveEntryButton").textContent = "保存修改";
+    setShellMode(record.hasShell);
+    el("shellWeight").value = record.shell ? String(record.shell) : "";
+    el("formTitle").textContent = focusShell ? "补录壳的重量" : "修改这条记录";
+    el("saveEntryButton").textContent = focusShell ? "保存并计算净重" : "保存修改";
     el("cancelEditButton").classList.remove("hidden");
     selectType(record.type);
-    el("actualWeight").focus();
+    updatePreview();
+    (focusShell ? el("shellWeight") : el("actualWeight")).focus();
     window.scrollTo({ top: el("entryForm").getBoundingClientRect().top + window.scrollY - 90, behavior: "smooth" });
   }
 
@@ -298,7 +360,7 @@
   }
 
   function exportData() {
-    const payload = { app: "饮食重量记录", version: 1, exportedAt: new Date().toISOString(), data: state };
+    const payload = { app: "饮食重量记录", version: 2, exportedAt: new Date().toISOString(), data: state };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -354,12 +416,15 @@
       if (button) selectType(button.dataset.type);
     });
     el("actualWeight").addEventListener("input", updatePreview);
+    el("shellWeight").addEventListener("input", updatePreview);
+    el("shellToggle").addEventListener("click", () => setShellMode(!shellMode));
     el("entryForm").addEventListener("submit", submitEntry);
     el("cancelEditButton").addEventListener("click", resetForm);
     el("recordsList").addEventListener("click", (event) => {
       const button = event.target.closest("[data-action]");
       if (!button) return;
       if (button.dataset.action === "edit") editRecord(button.dataset.id);
+      if (button.dataset.action === "shell") editRecord(button.dataset.id, true);
       if (button.dataset.action === "delete") deleteRecord(button.dataset.id);
     });
     el("previousDayButton").addEventListener("click", () => changeDate(-1));
@@ -404,6 +469,7 @@
   }
 
   bindEvents();
+  setShellMode(false);
   renderAll();
 
   if ("serviceWorker" in navigator) {

@@ -210,11 +210,9 @@
       el("formMessage").textContent = "单条记录最多 9999 克，请检查输入。";
       return;
     }
-    const name = el("foodName").value.trim().slice(0, 30);
     if (editingId) {
       const record = state.records.find((item) => item.id === editingId);
       if (record) {
-        record.name = name;
         record.actual = roundWeight(actual);
         record.type = selectedType;
       }
@@ -223,7 +221,7 @@
       state.records.push({
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         date: currentDate,
-        name,
+        name: "",
         type: selectedType,
         actual: roundWeight(actual),
         createdAt: Date.now()
@@ -239,7 +237,7 @@
     editingId = null;
     el("entryForm").reset();
     el("formMessage").textContent = "";
-    el("formTitle").textContent = "刚刚吃了什么？";
+    el("formTitle").textContent = "记录本次重量";
     el("saveEntryButton").textContent = "记下这餐";
     el("cancelEditButton").classList.add("hidden");
     selectType("solid");
@@ -249,13 +247,12 @@
     const record = state.records.find((item) => item.id === id);
     if (!record) return;
     editingId = record.id;
-    el("foodName").value = record.name;
     el("actualWeight").value = String(record.actual);
     el("formTitle").textContent = "修改这条记录";
     el("saveEntryButton").textContent = "保存修改";
     el("cancelEditButton").classList.remove("hidden");
     selectType(record.type);
-    el("foodName").focus();
+    el("actualWeight").focus();
     window.scrollTo({ top: el("entryForm").getBoundingClientRect().top + window.scrollY - 90, behavior: "smooth" });
   }
 

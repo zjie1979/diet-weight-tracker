@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f4f6ef" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="饮食重量" />
+    <meta name="description" content="按食物类型折算并记录每天的饮食重量。" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icon-180.png" />
+    <link rel="icon" href="./icon-192.png" />
+    <link rel="stylesheet" href="./styles.css" />
+    <title>饮食重量记录</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">每日轻记录</p>
+          <h1>饮食重量</h1>
+        </div>
+        <button class="icon-button" id="installHelpButton" type="button" aria-label="安装帮助">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 14v5h14v-5" /></svg>
+        </button>
+      </header>
+
+      <main>
+        <section class="view active" id="todayView" data-view="today">
+          <div class="date-switcher" aria-label="选择记录日期">
+            <button class="date-arrow" id="previousDayButton" type="button" aria-label="前一天">‹</button>
+            <button class="date-button" id="dateButton" type="button">
+              <span id="datePrimary">今天</span>
+              <small id="dateSecondary"></small>
+            </button>
+            <button class="date-arrow" id="nextDayButton" type="button" aria-label="后一天">›</button>
+            <input id="dateInput" type="date" aria-label="选择日期" />
+          </div>
+
+          <article class="progress-card" id="progressCard">
+            <div class="progress-copy">
+              <p class="card-kicker">今日已计入</p>
+              <div class="weight-total"><strong id="usedWeight">0</strong><span>克</span></div>
+              <p class="remaining" id="remainingText">还可以计入 650 克</p>
+            </div>
+            <div class="progress-ring" id="progressRing" role="img" aria-label="饮食重量完成进度">
+              <div class="ring-center">
+                <strong id="progressPercent">0%</strong>
+                <span id="limitLabel">上限 650g</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="entry-card">
+            <div class="section-heading">
+              <div>
+                <p class="card-kicker">新增一条</p>
+                <h2 id="formTitle">刚刚吃了什么？</h2>
+              </div>
+              <button class="text-button hidden" id="cancelEditButton" type="button">取消修改</button>
+            </div>
+
+            <form id="entryForm" novalidate>
+              <label class="field-label" for="foodName">食物名称 <span>可不填</span></label>
+              <input class="text-input" id="foodName" type="text" maxlength="30" placeholder="例如：米饭、拿铁、苹果" autocomplete="off" />
+
+              <label class="field-label" for="actualWeight">实际重量</label>
+              <div class="weight-input-wrap">
+                <input id="actualWeight" type="number" min="0.1" max="9999" step="0.1" inputmode="decimal" placeholder="0" required />
+                <span>克</span>
+              </div>
+
+              <fieldset class="type-fieldset">
+                <legend class="field-label">选择类型</legend>
+                <div class="type-grid" id="typeGrid">
+                  <button class="type-option selected" type="button" data-type="solid">
+                    <span class="type-icon solid-icon">●</span>
+                    <span><strong>固体</strong><small>计入 100%</small></span>
+                  </button>
+                  <button class="type-option" type="button" data-type="liquid">
+                    <span class="type-icon liquid-icon">◒</span>
+                    <span><strong>液体</strong><small>计入 10%</small></span>
+                  </button>
+                  <button class="type-option" type="button" data-type="nuts">
+                    <span class="type-icon nut-icon">◆</span>
+                    <span><strong>坚果</strong><small>计入 300%</small></span>
+                  </button>
+                  <button class="type-option" type="button" data-type="soft">
+                    <span class="type-icon soft-icon">◉</span>
+                    <span><strong>酸奶 / 粥</strong><small>计入 30%</small></span>
+                  </button>
+                  <button class="type-option wide" type="button" data-type="produce">
+                    <span class="type-icon produce-icon">✦</span>
+                    <span><strong>水果 / 蔬菜</strong><small>计入 50%</small></span>
+                  </button>
+                </div>
+              </fieldset>
+
+              <div class="calculation-preview" aria-live="polite">
+                <span>本次计入</span>
+                <strong id="calculatedWeight">0 克</strong>
+              </div>
+              <p class="form-message" id="formMessage" role="alert"></p>
+              <button class="primary-button" id="saveEntryButton" type="submit">记下这餐</button>
+            </form>
+          </article>
+
+          <section class="records-section">
+            <div class="section-heading records-heading">
+              <div>
+                <p class="card-kicker">当天明细</p>
+                <h2 id="recordsTitle">0 条记录</h2>
+              </div>
+              <span class="actual-total" id="actualTotal">实际共 0 克</span>
+            </div>
+            <div id="recordsList" class="records-list"></div>
+            <div class="empty-state" id="recordsEmpty">
+              <div class="empty-illustration" aria-hidden="true">＋</div>
+              <p>还没有记录</p>
+              <span>从上面记下今天的第一份食物吧</span>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="historyView" data-view="history">
+          <div class="page-heading">
+            <p class="eyebrow">最近 14 天</p>
+            <h2>记录回顾</h2>
+            <p>点击任意一天，可以查看或补记当天明细。</p>
+          </div>
+          <div class="history-summary">
+            <div><span>有记录</span><strong id="recordedDays">0 天</strong></div>
+            <div><span>平均计入</span><strong id="averageWeight">0 克</strong></div>
+            <div><span>未超上限</span><strong id="withinLimitDays">0 天</strong></div>
+          </div>
+          <div class="history-list" id="historyList"></div>
+        </section>
+
+        <section class="view" id="settingsView" data-view="settings">
+          <div class="page-heading">
+            <p class="eyebrow">按你的节奏</p>
+            <h2>设置</h2>
+            <p>调整每日上限，查看折算规则和管理本机数据。</p>
+          </div>
+
+          <article class="settings-card accent-card">
+            <label class="field-label" for="dailyLimit">每日计入上限</label>
+            <div class="setting-row">
+              <div class="weight-input-wrap compact">
+                <input id="dailyLimit" type="number" min="1" max="9999" step="1" inputmode="numeric" />
+                <span>克</span>
+              </div>
+              <button class="secondary-button" id="saveLimitButton" type="button">保存</button>
+            </div>
+            <p class="settings-note" id="limitSaveMessage">默认 650 克，保存后立即应用到每天。</p>
+          </article>
+
+          <article class="settings-card">
+            <div class="section-heading">
+              <div>
+                <p class="card-kicker">固定规则</p>
+                <h3>重量如何计入</h3>
+              </div>
+            </div>
+            <div class="rule-list">
+              <div><span>固体食物</span><strong>实际重量 × 100%</strong></div>
+              <div><span>液体</span><strong>实际重量 × 10%</strong></div>
+              <div><span>坚果</span><strong>实际重量 × 3 倍</strong></div>
+              <div><span>酸奶、粥等</span><strong>实际重量 × 30%</strong></div>
+              <div><span>水果、蔬菜</span><strong>实际重量 × 50%</strong></div>
+            </div>
+          </article>
+
+          <article class="settings-card">
+            <div class="privacy-heading">
+              <span class="privacy-icon">⌁</span>
+              <div><h3>数据只在本机</h3><p>饮食记录保存在这个浏览器里，不会上传到网站服务器。</p></div>
+            </div>
+            <div class="data-actions">
+              <button class="secondary-button" id="exportButton" type="button">导出备份</button>
+              <label class="secondary-button file-button" for="importInput">导入备份</label>
+              <input id="importInput" type="file" accept="application/json,.json" />
+              <button class="danger-button" id="clearDataButton" type="button">清空全部记录</button>
+            </div>
+          </article>
+
+          <article class="settings-card install-card" id="installCard">
+            <p class="card-kicker">iPhone 安装</p>
+            <h3>把它放到主屏幕</h3>
+            <ol>
+              <li>使用 Safari 打开本页面</li>
+              <li>点击底部“分享”按钮</li>
+              <li>选择“添加到主屏幕”</li>
+            </ol>
+            <button class="primary-button hidden" id="installButton" type="button">安装到设备</button>
+          </article>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="主要导航">
+        <button class="nav-button active" type="button" data-target="today">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 2v4m6-4v4M6 9h12" /></svg>
+          <span>今天</span>
+        </button>
+        <button class="nav-button" type="button" data-target="history">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18l5-5 3 3 7-9M4 20h16" /></svg>
+          <span>记录</span>
+        </button>
+        <button class="nav-button" type="button" data-target="settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0-5v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4" /></svg>
+          <span>设置</span>
+        </button>
+      </nav>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js" defer></script>
+  </body>
+</html>

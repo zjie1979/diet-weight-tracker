@@ -328,7 +328,11 @@ button { color: inherit; }
   color: var(--muted);
   font-size: 11px;
 }
-.plan-type-preview strong { color: var(--green-dark); font-size: 13px; }
+.plan-type-preview div { min-width: 0; }
+.plan-type-preview span, .plan-type-preview strong { display: block; }
+.plan-type-preview strong { margin-top: 3px; color: var(--green-dark); font-size: 13px; }
+.plan-effective-preview { flex: 0 0 auto; text-align: right; }
+.plan-effective-preview strong { font-size: 16px; }
 .plan-type-help { margin: 6px 2px 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .plan-note { margin: 10px 2px 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
 .plan-list-section { margin-top: 24px; }
@@ -365,6 +369,7 @@ button { color: inherit; }
 .plan-item.completed .plan-item-copy strong { color: #607069; text-decoration: line-through; text-decoration-thickness: 1px; }
 .plan-item-actions { display: grid; justify-items: end; gap: 6px; }
 .plan-item-actions strong { color: var(--green-dark); font-size: 14px; }
+.plan-item-actions span { margin-top: -4px; color: var(--muted); font-size: 10px; }
 .plan-delete-button { padding: 4px 6px; border: 0; background: transparent; color: #a24d3e; font-size: 10px; cursor: pointer; }
 
 .settings-card { box-shadow: 0 10px 32px rgba(31,66,54,.07); }

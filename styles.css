@@ -316,6 +316,20 @@ button { color: inherit; }
   font-weight: 800;
 }
 .plan-entry-card { margin-top: 15px; }
+.plan-type-preview {
+  margin: 13px 0 0;
+  padding: 11px 13px;
+  border-radius: 13px;
+  background: #f2f7f3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.plan-type-preview strong { color: var(--green-dark); font-size: 13px; }
+.plan-type-help { margin: 6px 2px 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .plan-note { margin: 10px 2px 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
 .plan-list-section { margin-top: 24px; }
 .plan-list { display: grid; gap: 10px; }

@@ -1,13 +1,14 @@
-const CACHE_NAME = "diet-weight-pwa-v6";
+const RESOURCE_VERSION = "7";
+const CACHE_NAME = `diet-weight-pwa-v${RESOURCE_VERSION}`;
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css",
-  "./app.js",
-  "./manifest.webmanifest",
-  "./icon-180.png",
-  "./icon-192.png",
-  "./icon-512.png"
+  `./styles.css?v=${RESOURCE_VERSION}`,
+  `./app.js?v=${RESOURCE_VERSION}`,
+  `./manifest.webmanifest?v=${RESOURCE_VERSION}`,
+  `./icon-180.png?v=${RESOURCE_VERSION}`,
+  `./icon-192.png?v=${RESOURCE_VERSION}`,
+  `./icon-512.png?v=${RESOURCE_VERSION}`
 ];
 
 self.addEventListener("install", (event) => {

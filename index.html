@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="饮食重量" />
     <meta name="description" content="制定每日饮食计划、逐项打卡，并按食物类型折算记录饮食重量。" />
-    <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="./icon-180.png" />
-    <link rel="icon" href="./icon-192.png" />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="manifest" href="./manifest.webmanifest?v=7" />
+    <link rel="apple-touch-icon" href="./icon-180.png?v=7" />
+    <link rel="icon" href="./icon-192.png?v=7" />
+    <link rel="stylesheet" href="./styles.css?v=7" />
     <title>饮食重量记录</title>
   </head>
   <body>
@@ -162,7 +162,7 @@
             <div>
               <p class="card-kicker">计划完成度</p>
               <div class="plan-count"><strong id="planDoneCount">0</strong><span id="planTotalCount">/ 0 项</span></div>
-              <p id="planGramSummary">已打卡 0 / 0 克</p>
+              <p id="planGramSummary">已打卡计入 0 / 计划计入 0 克</p>
             </div>
             <div class="plan-percent" id="planPercent" aria-label="计划完成 0%">0%</div>
           </article>
@@ -183,8 +183,14 @@
                 <span>克</span>
               </div>
               <div class="plan-type-preview" aria-live="polite">
-                <span>自动识别类型</span>
-                <strong id="planDetectedType">填写食物后显示</strong>
+                <div>
+                  <span>自动识别类型</span>
+                  <strong id="planDetectedType">填写食物后显示</strong>
+                </div>
+                <div class="plan-effective-preview">
+                  <span>预计计入</span>
+                  <strong id="planCalculatedWeight">0 克</strong>
+                </div>
               </div>
               <p class="plan-type-help">自动识别为固体、液体或酸奶/粥；无法明确判断时按固体。</p>
               <p class="plan-note">计划打卡只记录完成状态，不会重复计入当天饮食重量。</p>
@@ -290,6 +296,6 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js" defer></script>
+    <script src="./app.js?v=7" defer></script>
   </body>
 </html>

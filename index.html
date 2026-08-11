@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="饮食重量" />
-    <meta name="description" content="按食物类型折算并记录每天的饮食重量。" />
+    <meta name="description" content="制定每日饮食计划、逐项打卡，并按食物类型折算记录饮食重量。" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icon-180.png" />
     <link rel="icon" href="./icon-192.png" />
@@ -149,6 +149,70 @@
           <div class="history-list" id="historyList"></div>
         </section>
 
+        <section class="view" id="planView" data-view="plan">
+          <div class="page-heading">
+            <p class="eyebrow">提前想好，更容易做到</p>
+            <h2>饮食计划</h2>
+            <p>按日期写下准备吃的食物和克数，吃完后逐项打卡。</p>
+          </div>
+
+          <div class="date-switcher plan-date-switcher" aria-label="选择计划日期">
+            <button class="date-arrow" id="planPreviousDayButton" type="button" aria-label="计划前一天">‹</button>
+            <button class="date-button" id="planDateButton" type="button">
+              <span id="planDatePrimary">今天</span>
+              <small id="planDateSecondary"></small>
+            </button>
+            <button class="date-arrow" id="planNextDayButton" type="button" aria-label="计划后一天">›</button>
+            <input id="planDateInput" type="date" aria-label="选择计划日期" />
+          </div>
+
+          <article class="plan-summary-card">
+            <div>
+              <p class="card-kicker">计划完成度</p>
+              <div class="plan-count"><strong id="planDoneCount">0</strong><span id="planTotalCount">/ 0 项</span></div>
+              <p id="planGramSummary">已打卡 0 / 0 克</p>
+            </div>
+            <div class="plan-percent" id="planPercent" aria-label="计划完成 0%">0%</div>
+          </article>
+
+          <article class="entry-card plan-entry-card">
+            <div class="section-heading">
+              <div>
+                <p class="card-kicker">添加计划</p>
+                <h2>今天准备吃什么</h2>
+              </div>
+            </div>
+            <form id="planForm" novalidate>
+              <label class="field-label" for="planFood">食物</label>
+              <input class="text-input" id="planFood" type="text" maxlength="30" placeholder="例如：鸡蛋、苹果、米饭" autocomplete="off" required />
+              <label class="field-label" for="planWeight">计划重量</label>
+              <div class="weight-input-wrap">
+                <input id="planWeight" type="number" min="0.1" max="9999" step="0.1" inputmode="decimal" placeholder="0" required />
+                <span>克</span>
+              </div>
+              <p class="plan-note">计划打卡只记录完成状态，不会重复计入当天饮食重量。</p>
+              <p class="form-message" id="planFormMessage" role="alert"></p>
+              <button class="primary-button" type="submit">加入计划</button>
+            </form>
+          </article>
+
+          <section class="records-section plan-list-section">
+            <div class="section-heading records-heading">
+              <div>
+                <p class="card-kicker">当天计划</p>
+                <h2 id="planListTitle">0 项</h2>
+              </div>
+              <span class="actual-total" id="planListStatus">还没有安排</span>
+            </div>
+            <div id="planList" class="plan-list"></div>
+            <div class="empty-state" id="planEmpty">
+              <div class="empty-illustration" aria-hidden="true">✓</div>
+              <p>还没有饮食计划</p>
+              <span>先添加一种食物和准备吃的克数吧</span>
+            </div>
+          </section>
+        </section>
+
         <section class="view" id="settingsView" data-view="settings">
           <div class="page-heading">
             <p class="eyebrow">按你的节奏</p>
@@ -193,7 +257,7 @@
               <button class="secondary-button" id="exportButton" type="button">导出备份</button>
               <label class="secondary-button file-button" for="importInput">导入备份</label>
               <input id="importInput" type="file" accept="application/json,.json" />
-              <button class="danger-button" id="clearDataButton" type="button">清空全部记录</button>
+              <button class="danger-button" id="clearDataButton" type="button">清空全部数据</button>
             </div>
           </article>
 
@@ -214,6 +278,10 @@
         <button class="nav-button active" type="button" data-target="today">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 2v4m6-4v4M6 9h12" /></svg>
           <span>今天</span>
+        </button>
+        <button class="nav-button" type="button" data-target="plan">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h3M4 8h2m-2 4h2m-2 4h2" /></svg>
+          <span>计划</span>
         </button>
         <button class="nav-button" type="button" data-target="history">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18l5-5 3 3 7-9M4 20h16" /></svg>

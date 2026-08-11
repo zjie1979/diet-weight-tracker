@@ -1,7 +1,7 @@
 {
   "name": "饮食重量记录",
   "short_name": "饮食重量",
-  "description": "按食物类型折算并记录每天的饮食重量。",
+  "description": "制定每日饮食计划、逐项打卡，并按食物类型折算记录饮食重量。",
   "lang": "zh-CN",
   "start_url": "./",
   "scope": "./",

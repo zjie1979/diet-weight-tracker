@@ -24,6 +24,7 @@
 
   let state = loadState();
   let currentDate = todayString();
+  let planDate = todayString();
   let selectedType = "solid";
   let editingId = null;
   let shellMode = false;
@@ -31,7 +32,7 @@
   let toastTimer = null;
 
   function loadState() {
-    const fallback = { limit: 650, records: [] };
+    const fallback = { limit: 650, records: [], plans: [] };
     try {
       const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
       if (!parsed || !Array.isArray(parsed.records)) return fallback;
@@ -57,7 +58,18 @@
               shell,
               createdAt: Number(record.createdAt) || Date.now()
             };
-          })
+          }),
+        plans: (Array.isArray(parsed.plans) ? parsed.plans : [])
+          .filter((plan) => plan && /^\d{4}-\d{2}-\d{2}$/.test(plan.date) && String(plan.food || "").trim() && Number(plan.grams) > 0)
+          .map((plan) => ({
+            id: String(plan.id || `${Date.now()}-${Math.random()}`),
+            date: plan.date,
+            food: String(plan.food).trim().slice(0, 30),
+            grams: roundWeight(Math.min(Number(plan.grams), 9999)),
+            completed: Boolean(plan.completed),
+            completedAt: plan.completed && Number(plan.completedAt) ? Number(plan.completedAt) : null,
+            createdAt: Number(plan.createdAt) || Date.now()
+          }))
       };
     } catch {
       return fallback;
@@ -91,6 +103,12 @@
     };
   }
 
+  function plansFor(date) {
+    return state.plans
+      .filter((plan) => plan.date === date)
+      .sort((a, b) => Number(a.completed) - Number(b.completed) || a.createdAt - b.createdAt);
+  }
+
   function formatDateHeading(dateString) {
     const date = parseDate(dateString);
     const today = todayString();
@@ -109,9 +127,11 @@
 
   function renderAll() {
     renderDate();
+    renderPlanDate();
     renderProgress();
     renderRecords();
     renderHistory();
+    renderPlans();
     el("dailyLimit").value = String(state.limit);
   }
 
@@ -122,6 +142,13 @@
     el("dateInput").value = currentDate;
     el("dateInput").max = todayString();
     el("nextDayButton").disabled = currentDate >= todayString();
+  }
+
+  function renderPlanDate() {
+    const label = formatDateHeading(planDate);
+    el("planDatePrimary").textContent = label.primary;
+    el("planDateSecondary").textContent = label.secondary;
+    el("planDateInput").value = planDate;
   }
 
   function renderProgress() {
@@ -205,6 +232,41 @@
           </span>
           <span class="history-bar"><span></span></span>
         </button>`;
+    }).join("");
+  }
+
+  function renderPlans() {
+    const plans = plansFor(planDate);
+    const completed = plans.filter((plan) => plan.completed);
+    const totalGrams = roundWeight(plans.reduce((sum, plan) => sum + plan.grams, 0));
+    const completedGrams = roundWeight(completed.reduce((sum, plan) => sum + plan.grams, 0));
+    const percent = plans.length ? Math.round((completed.length / plans.length) * 100) : 0;
+
+    el("planDoneCount").textContent = String(completed.length);
+    el("planTotalCount").textContent = `/ ${plans.length} 项`;
+    el("planGramSummary").textContent = `已打卡 ${formatWeight(completedGrams)} / ${formatWeight(totalGrams)} 克`;
+    el("planPercent").textContent = `${percent}%`;
+    el("planPercent").setAttribute("aria-label", `计划完成 ${percent}%`);
+    el("planListTitle").textContent = `${plans.length} 项计划`;
+    el("planListStatus").textContent = plans.length ? `已完成 ${completed.length} 项` : "还没有安排";
+    el("planEmpty").classList.toggle("hidden", plans.length > 0);
+    el("planList").innerHTML = plans.map((plan) => {
+      const safeFood = escapeHTML(plan.food);
+      const completedTime = plan.completedAt
+        ? new Date(plan.completedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })
+        : "";
+      return `
+        <article class="plan-item${plan.completed ? " completed" : ""}">
+          <button class="plan-check-button" type="button" data-plan-action="toggle" data-id="${escapeHTML(plan.id)}" aria-pressed="${plan.completed}" aria-label="${plan.completed ? "取消打卡" : "打卡"} ${safeFood} ${formatWeight(plan.grams)}克">${plan.completed ? "✓" : "○"}</button>
+          <div class="plan-item-copy">
+            <strong>${safeFood}</strong>
+            <span>${plan.completed ? `已打卡 · ${completedTime}` : "等待打卡"}</span>
+          </div>
+          <div class="plan-item-actions">
+            <strong>${formatWeight(plan.grams)}g</strong>
+            <button class="plan-delete-button" type="button" data-plan-action="delete" data-id="${escapeHTML(plan.id)}" aria-label="删除计划 ${safeFood}">删除</button>
+          </div>
+        </article>`;
     }).join("");
   }
 
@@ -329,6 +391,56 @@
     showToast("记录已删除");
   }
 
+  function submitPlan(event) {
+    event.preventDefault();
+    const food = el("planFood").value.trim();
+    const grams = Number(el("planWeight").value);
+    if (!food) {
+      el("planFormMessage").textContent = "请输入计划食物。";
+      el("planFood").focus();
+      return;
+    }
+    if (!Number.isFinite(grams) || grams <= 0 || grams > 9999) {
+      el("planFormMessage").textContent = "请输入 0.1 到 9999 克之间的计划重量。";
+      el("planWeight").focus();
+      return;
+    }
+    state.plans.push({
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      date: planDate,
+      food: food.slice(0, 30),
+      grams: roundWeight(grams),
+      completed: false,
+      completedAt: null,
+      createdAt: Date.now()
+    });
+    saveState();
+    el("planForm").reset();
+    el("planFormMessage").textContent = "";
+    renderPlans();
+    showToast("已加入当天饮食计划");
+  }
+
+  function togglePlan(id) {
+    const plan = state.plans.find((item) => item.id === id);
+    if (!plan) return;
+    plan.completed = !plan.completed;
+    plan.completedAt = plan.completed ? Date.now() : null;
+    saveState();
+    renderPlans();
+    showToast(plan.completed ? `${plan.food} 已打卡` : `${plan.food} 已取消打卡`);
+  }
+
+  function deletePlan(id) {
+    const plan = state.plans.find((item) => item.id === id);
+    if (!plan) return;
+    if (!window.confirm(`确定删除“${plan.food} ${formatWeight(plan.grams)}克”这项计划吗？`)) return;
+    state.plans = state.plans.filter((item) => item.id !== id);
+    saveState();
+    renderPlans();
+    showToast("计划已删除");
+  }
+
   function changeDate(offset) {
     const next = parseDate(currentDate);
     next.setDate(next.getDate() + offset);
@@ -339,10 +451,24 @@
     renderAll();
   }
 
+  function changePlanDate(offset) {
+    const next = parseDate(planDate);
+    next.setDate(next.getDate() + offset);
+    planDate = toDateString(next);
+    el("planForm").reset();
+    el("planFormMessage").textContent = "";
+    renderPlanDate();
+    renderPlans();
+  }
+
   function switchView(target) {
     document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.dataset.view === target));
     document.querySelectorAll(".nav-button").forEach((button) => button.classList.toggle("active", button.dataset.target === target));
     if (target === "history") renderHistory();
+    if (target === "plan") {
+      renderPlanDate();
+      renderPlans();
+    }
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -360,7 +486,7 @@
   }
 
   function exportData() {
-    const payload = { app: "饮食重量记录", version: 2, exportedAt: new Date().toISOString(), data: state };
+    const payload = { app: "饮食重量记录", version: 3, exportedAt: new Date().toISOString(), data: state };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -384,6 +510,7 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(source));
       state = loadState();
       currentDate = todayString();
+      planDate = todayString();
       resetForm();
       renderAll();
       showToast("备份已导入");
@@ -395,8 +522,10 @@
   }
 
   function clearData() {
-    if (!window.confirm("确定清空全部饮食记录吗？此操作无法撤销，建议先导出备份。")) return;
+    if (!window.confirm("确定清空全部饮食记录和饮食计划吗？此操作无法撤销，建议先导出备份。")) return;
     state.records = [];
+    state.plans = [];
+    el("planForm").reset();
     saveState();
     resetForm();
     renderAll();
@@ -427,6 +556,13 @@
       if (button.dataset.action === "shell") editRecord(button.dataset.id, true);
       if (button.dataset.action === "delete") deleteRecord(button.dataset.id);
     });
+    el("planForm").addEventListener("submit", submitPlan);
+    el("planList").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-plan-action]");
+      if (!button) return;
+      if (button.dataset.planAction === "toggle") togglePlan(button.dataset.id);
+      if (button.dataset.planAction === "delete") deletePlan(button.dataset.id);
+    });
     el("previousDayButton").addEventListener("click", () => changeDate(-1));
     el("nextDayButton").addEventListener("click", () => changeDate(1));
     el("dateButton").addEventListener("click", () => {
@@ -438,6 +574,21 @@
         currentDate = event.target.value;
         resetForm();
         renderAll();
+      }
+    });
+    el("planPreviousDayButton").addEventListener("click", () => changePlanDate(-1));
+    el("planNextDayButton").addEventListener("click", () => changePlanDate(1));
+    el("planDateButton").addEventListener("click", () => {
+      if (typeof el("planDateInput").showPicker === "function") el("planDateInput").showPicker();
+      else el("planDateInput").click();
+    });
+    el("planDateInput").addEventListener("change", (event) => {
+      if (event.target.value) {
+        planDate = event.target.value;
+        el("planForm").reset();
+        el("planFormMessage").textContent = "";
+        renderPlanDate();
+        renderPlans();
       }
     });
     document.querySelectorAll(".nav-button").forEach((button) => button.addEventListener("click", () => switchView(button.dataset.target)));

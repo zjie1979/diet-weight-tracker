@@ -94,17 +94,9 @@
                     <span class="type-icon liquid-icon">◒</span>
                     <span><strong>液体</strong><small>计入 10%</small></span>
                   </button>
-                  <button class="type-option" type="button" data-type="nuts">
-                    <span class="type-icon nut-icon">◆</span>
-                    <span><strong>坚果</strong><small>计入 300%</small></span>
-                  </button>
-                  <button class="type-option" type="button" data-type="soft">
+                  <button class="type-option wide" type="button" data-type="soft">
                     <span class="type-icon soft-icon">◉</span>
                     <span><strong>酸奶 / 粥</strong><small>计入 30%</small></span>
-                  </button>
-                  <button class="type-option wide" type="button" data-type="produce">
-                    <span class="type-icon produce-icon">✦</span>
-                    <span><strong>水果 / 蔬菜</strong><small>计入 50%</small></span>
                   </button>
                 </div>
               </fieldset>
@@ -190,6 +182,11 @@
                 <input id="planWeight" type="number" min="0.1" max="9999" step="0.1" inputmode="decimal" placeholder="0" required />
                 <span>克</span>
               </div>
+              <div class="plan-type-preview" aria-live="polite">
+                <span>自动识别类型</span>
+                <strong id="planDetectedType">填写食物后显示</strong>
+              </div>
+              <p class="plan-type-help">自动识别为固体、液体或酸奶/粥；无法明确判断时按固体。</p>
               <p class="plan-note">计划打卡只记录完成状态，不会重复计入当天饮食重量。</p>
               <p class="form-message" id="planFormMessage" role="alert"></p>
               <button class="primary-button" type="submit">加入计划</button>
@@ -242,9 +239,7 @@
             <div class="rule-list">
               <div><span>固体食物</span><strong>实际重量 × 100%</strong></div>
               <div><span>液体</span><strong>实际重量 × 10%</strong></div>
-              <div><span>坚果</span><strong>实际重量 × 3 倍</strong></div>
               <div><span>酸奶、粥等</span><strong>实际重量 × 30%</strong></div>
-              <div><span>水果、蔬菜</span><strong>实际重量 × 50%</strong></div>
             </div>
           </article>
 

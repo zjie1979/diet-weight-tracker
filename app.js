@@ -116,6 +116,11 @@
       .sort((a, b) => Number(a.completed) - Number(b.completed) || a.createdAt - b.createdAt);
   }
 
+  function effectivePlanWeight(plan) {
+    const type = PLAN_TYPES.has(plan.type) ? plan.type : inferPlanType(plan.food);
+    return roundWeight(plan.grams * RULES[type].factor);
+  }
+
   function formatDateHeading(dateString) {
     const date = parseDate(dateString);
     const today = todayString();
@@ -246,13 +251,13 @@
   function renderPlans() {
     const plans = plansFor(planDate);
     const completed = plans.filter((plan) => plan.completed);
-    const totalGrams = roundWeight(plans.reduce((sum, plan) => sum + plan.grams, 0));
-    const completedGrams = roundWeight(completed.reduce((sum, plan) => sum + plan.grams, 0));
+    const totalGrams = roundWeight(plans.reduce((sum, plan) => sum + effectivePlanWeight(plan), 0));
+    const completedGrams = roundWeight(completed.reduce((sum, plan) => sum + effectivePlanWeight(plan), 0));
     const percent = plans.length ? Math.round((completed.length / plans.length) * 100) : 0;
 
     el("planDoneCount").textContent = String(completed.length);
     el("planTotalCount").textContent = `/ ${plans.length} 项`;
-    el("planGramSummary").textContent = `已打卡 ${formatWeight(completedGrams)} / ${formatWeight(totalGrams)} 克`;
+    el("planGramSummary").textContent = `已打卡计入 ${formatWeight(completedGrams)} / 计划计入 ${formatWeight(totalGrams)} 克`;
     el("planPercent").textContent = `${percent}%`;
     el("planPercent").setAttribute("aria-label", `计划完成 ${percent}%`);
     el("planListTitle").textContent = `${plans.length} 项计划`;
@@ -262,6 +267,7 @@
       const safeFood = escapeHTML(plan.food);
       const planType = PLAN_TYPES.has(plan.type) ? plan.type : inferPlanType(plan.food);
       const typeRule = RULES[planType];
+      const countedWeight = effectivePlanWeight(plan);
       const completedTime = plan.completedAt
         ? new Date(plan.completedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })
         : "";
@@ -273,7 +279,8 @@
             <span>${typeRule.symbol} ${typeRule.label} · ${plan.completed ? `已打卡 · ${completedTime}` : "等待打卡"}</span>
           </div>
           <div class="plan-item-actions">
-            <strong>${formatWeight(plan.grams)}g</strong>
+            <strong>计入 ${formatWeight(countedWeight)}g</strong>
+            <span>实际 ${formatWeight(plan.grams)}g</span>
             <button class="plan-delete-button" type="button" data-plan-action="delete" data-id="${escapeHTML(plan.id)}" aria-label="删除计划 ${safeFood}">删除</button>
           </div>
         </article>`;
@@ -300,12 +307,15 @@
 
   function updatePlanTypePreview() {
     const food = el("planFood").value.trim();
+    const grams = Number(el("planWeight").value) || 0;
     if (!food) {
       el("planDetectedType").textContent = "填写食物后显示";
+      el("planCalculatedWeight").textContent = "0 克";
       return;
     }
     const rule = RULES[inferPlanType(food)];
-    el("planDetectedType").textContent = `${rule.symbol} ${rule.label}`;
+    el("planDetectedType").textContent = `${rule.symbol} ${rule.label} · ${formatWeight(rule.factor * 100)}%`;
+    el("planCalculatedWeight").textContent = `${formatWeight(grams * rule.factor)} 克`;
   }
 
   function updatePreview() {
@@ -523,7 +533,7 @@
   }
 
   function exportData() {
-    const payload = { app: "饮食重量记录", version: 4, exportedAt: new Date().toISOString(), data: state };
+    const payload = { app: "饮食重量记录", version: 5, exportedAt: new Date().toISOString(), data: state };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -596,6 +606,7 @@
     });
     el("planForm").addEventListener("submit", submitPlan);
     el("planFood").addEventListener("input", updatePlanTypePreview);
+    el("planWeight").addEventListener("input", updatePlanTypePreview);
     el("planList").addEventListener("click", (event) => {
       const button = event.target.closest("[data-plan-action]");
       if (!button) return;

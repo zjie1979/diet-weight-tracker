@@ -9,6 +9,9 @@
     soft: { label: "酸奶 / 粥", factor: 0.3, symbol: "◉" },
     produce: { label: "水果 / 蔬菜", factor: 0.5, symbol: "✦" }
   };
+  const PLAN_TYPES = new Set(["solid", "liquid", "soft"]);
+  const SOFT_KEYWORDS = ["酸奶", "酸乳", "发酵乳", "粥", "稀饭", "米糊", "芝麻糊", "藕粉"];
+  const LIQUID_KEYWORDS = ["牛奶", "豆浆", "果汁", "咖啡", "奶茶", "饮料", "饮品", "可乐", "气泡水", "矿泉水"];
 
   const el = (id) => document.getElementById(id);
   const todayString = () => {
@@ -61,15 +64,19 @@
           }),
         plans: (Array.isArray(parsed.plans) ? parsed.plans : [])
           .filter((plan) => plan && /^\d{4}-\d{2}-\d{2}$/.test(plan.date) && String(plan.food || "").trim() && Number(plan.grams) > 0)
-          .map((plan) => ({
-            id: String(plan.id || `${Date.now()}-${Math.random()}`),
-            date: plan.date,
-            food: String(plan.food).trim().slice(0, 30),
-            grams: roundWeight(Math.min(Number(plan.grams), 9999)),
-            completed: Boolean(plan.completed),
-            completedAt: plan.completed && Number(plan.completedAt) ? Number(plan.completedAt) : null,
-            createdAt: Number(plan.createdAt) || Date.now()
-          }))
+          .map((plan) => {
+            const food = String(plan.food).trim().slice(0, 30);
+            return {
+              id: String(plan.id || `${Date.now()}-${Math.random()}`),
+              date: plan.date,
+              food,
+              type: PLAN_TYPES.has(plan.type) ? plan.type : inferPlanType(food),
+              grams: roundWeight(Math.min(Number(plan.grams), 9999)),
+              completed: Boolean(plan.completed),
+              completedAt: plan.completed && Number(plan.completedAt) ? Number(plan.completedAt) : null,
+              createdAt: Number(plan.createdAt) || Date.now()
+            };
+          })
       };
     } catch {
       return fallback;
@@ -132,6 +139,7 @@
     renderRecords();
     renderHistory();
     renderPlans();
+    updatePlanTypePreview();
     el("dailyLimit").value = String(state.limit);
   }
 
@@ -252,6 +260,8 @@
     el("planEmpty").classList.toggle("hidden", plans.length > 0);
     el("planList").innerHTML = plans.map((plan) => {
       const safeFood = escapeHTML(plan.food);
+      const planType = PLAN_TYPES.has(plan.type) ? plan.type : inferPlanType(plan.food);
+      const typeRule = RULES[planType];
       const completedTime = plan.completedAt
         ? new Date(plan.completedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })
         : "";
@@ -260,7 +270,7 @@
           <button class="plan-check-button" type="button" data-plan-action="toggle" data-id="${escapeHTML(plan.id)}" aria-pressed="${plan.completed}" aria-label="${plan.completed ? "取消打卡" : "打卡"} ${safeFood} ${formatWeight(plan.grams)}克">${plan.completed ? "✓" : "○"}</button>
           <div class="plan-item-copy">
             <strong>${safeFood}</strong>
-            <span>${plan.completed ? `已打卡 · ${completedTime}` : "等待打卡"}</span>
+            <span>${typeRule.symbol} ${typeRule.label} · ${plan.completed ? `已打卡 · ${completedTime}` : "等待打卡"}</span>
           </div>
           <div class="plan-item-actions">
             <strong>${formatWeight(plan.grams)}g</strong>
@@ -272,6 +282,30 @@
 
   function escapeHTML(value) {
     return String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", "\"": "&quot;" })[character]);
+  }
+
+  function inferPlanType(food) {
+    const normalized = String(food || "").replace(/\s+/g, "").toLowerCase();
+    if (SOFT_KEYWORDS.some((keyword) => normalized.includes(keyword))) return "soft";
+    if (
+      LIQUID_KEYWORDS.some((keyword) => normalized.includes(keyword))
+      || normalized === "水"
+      || normalized.endsWith("水")
+      || normalized.endsWith("汤")
+      || normalized.endsWith("茶")
+      || normalized.endsWith("酒")
+    ) return "liquid";
+    return "solid";
+  }
+
+  function updatePlanTypePreview() {
+    const food = el("planFood").value.trim();
+    if (!food) {
+      el("planDetectedType").textContent = "填写食物后显示";
+      return;
+    }
+    const rule = RULES[inferPlanType(food)];
+    el("planDetectedType").textContent = `${rule.symbol} ${rule.label}`;
   }
 
   function updatePreview() {
@@ -409,6 +443,7 @@
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       date: planDate,
       food: food.slice(0, 30),
+      type: inferPlanType(food),
       grams: roundWeight(grams),
       completed: false,
       completedAt: null,
@@ -417,6 +452,7 @@
     saveState();
     el("planForm").reset();
     el("planFormMessage").textContent = "";
+    updatePlanTypePreview();
     renderPlans();
     showToast("已加入当天饮食计划");
   }
@@ -457,6 +493,7 @@
     planDate = toDateString(next);
     el("planForm").reset();
     el("planFormMessage").textContent = "";
+    updatePlanTypePreview();
     renderPlanDate();
     renderPlans();
   }
@@ -486,7 +523,7 @@
   }
 
   function exportData() {
-    const payload = { app: "饮食重量记录", version: 3, exportedAt: new Date().toISOString(), data: state };
+    const payload = { app: "饮食重量记录", version: 4, exportedAt: new Date().toISOString(), data: state };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -526,6 +563,7 @@
     state.records = [];
     state.plans = [];
     el("planForm").reset();
+    updatePlanTypePreview();
     saveState();
     resetForm();
     renderAll();
@@ -557,6 +595,7 @@
       if (button.dataset.action === "delete") deleteRecord(button.dataset.id);
     });
     el("planForm").addEventListener("submit", submitPlan);
+    el("planFood").addEventListener("input", updatePlanTypePreview);
     el("planList").addEventListener("click", (event) => {
       const button = event.target.closest("[data-plan-action]");
       if (!button) return;
@@ -587,6 +626,7 @@
         planDate = event.target.value;
         el("planForm").reset();
         el("planFormMessage").textContent = "";
+        updatePlanTypePreview();
         renderPlanDate();
         renderPlans();
       }

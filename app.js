@@ -353,7 +353,13 @@
 
   function submitEntry(event) {
     event.preventDefault();
+    const name = el("foodName").value.trim();
     const actual = Number(el("actualWeight").value);
+    if (!name) {
+      el("formMessage").textContent = "请输入这次吃的食物名称。";
+      el("foodName").focus();
+      return;
+    }
     if (!Number.isFinite(actual) || actual <= 0) {
       el("formMessage").textContent = "请输入大于 0 的实际重量。";
       el("actualWeight").focus();
@@ -373,6 +379,7 @@
     if (editingId) {
       const record = state.records.find((item) => item.id === editingId);
       if (record) {
+        record.name = name.slice(0, 30);
         record.actual = roundWeight(actual);
         record.type = selectedType;
         record.hasShell = shellMode;
@@ -383,7 +390,7 @@
       state.records.push({
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         date: currentDate,
-        name: "",
+        name: name.slice(0, 30),
         type: selectedType,
         actual: roundWeight(actual),
         hasShell: shellMode,
@@ -401,7 +408,7 @@
     editingId = null;
     el("entryForm").reset();
     el("formMessage").textContent = "";
-    el("formTitle").textContent = "记录本次重量";
+    el("formTitle").textContent = "记录吃了什么和重量";
     el("saveEntryButton").textContent = "记下这餐";
     el("cancelEditButton").classList.add("hidden");
     setShellMode(false);
@@ -412,6 +419,7 @@
     const record = state.records.find((item) => item.id === id);
     if (!record) return;
     editingId = record.id;
+    el("foodName").value = record.name || "";
     el("actualWeight").value = String(record.actual);
     setShellMode(record.hasShell);
     el("shellWeight").value = record.shell ? String(record.shell) : "";

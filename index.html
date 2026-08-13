@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="饮食重量" />
     <meta name="description" content="制定每日饮食计划、逐项打卡，并按食物类型折算记录饮食重量。" />
-    <link rel="manifest" href="./manifest.webmanifest?v=13" />
-    <link rel="apple-touch-icon" href="./icon-180.png?v=13" />
-    <link rel="icon" href="./icon-192.png?v=13" />
-    <link rel="stylesheet" href="./styles.css?v=13" />
+    <link rel="manifest" href="./manifest.webmanifest?v=14" />
+    <link rel="apple-touch-icon" href="./icon-180.png?v=14" />
+    <link rel="icon" href="./icon-192.png?v=14" />
+    <link rel="stylesheet" href="./styles.css?v=14" />
     <title>饮食重量记录</title>
   </head>
   <body>
@@ -43,10 +43,6 @@
               <p class="card-kicker">今日已计入</p>
               <div class="weight-total"><strong id="usedWeight">0</strong><span>克</span></div>
               <p class="remaining" id="remainingText">还可以计入 650 克</p>
-              <p class="calorie-total" id="calorieTotal">
-                <span>已摄入 <strong id="consumedCalories">0</strong> 千卡</span>
-                <span id="calorieRemaining">剩余 1600 千卡</span>
-              </p>
             </div>
             <div class="progress-ring" id="progressRing" role="img" aria-label="饮食重量完成进度">
               <div class="ring-center">
@@ -84,32 +80,6 @@
                 <input id="actualWeight" type="number" min="0.1" max="9999" step="0.1" inputmode="decimal" placeholder="0" required />
                 <span>克</span>
               </div>
-
-              <fieldset class="energy-fieldset">
-                <legend class="field-label">包装上的热量标签 <span>可选填写</span></legend>
-                <div class="energy-basis-grid" id="energyBasisGrid">
-                  <button class="energy-basis-option selected" type="button" data-energy-basis="per100">每 100 克</button>
-                  <button class="energy-basis-option" type="button" data-energy-basis="package">每份 / 包装</button>
-                </div>
-                <label class="field-label" for="energyValue">标签热量</label>
-                <div class="energy-input-row">
-                  <div class="weight-input-wrap calorie-input-wrap">
-                    <input id="energyValue" type="number" min="0" max="99999" step="0.1" inputmode="decimal" placeholder="0" />
-                  </div>
-                  <select class="energy-unit-select" id="energyUnit" aria-label="热量单位">
-                    <option value="kcal">大卡 kcal</option>
-                    <option value="kj">千焦 kJ</option>
-                  </select>
-                </div>
-                <div class="package-weight-fields hidden" id="packageWeightFields">
-                  <label class="field-label" for="packageWeight">每份 / 包装净含量</label>
-                  <div class="weight-input-wrap calorie-input-wrap">
-                    <input id="packageWeight" type="number" min="0.1" max="9999" step="0.1" inputmode="decimal" placeholder="0" />
-                    <span>克</span>
-                  </div>
-                </div>
-                <p class="energy-preview" id="energyPreview">填写标签热量后自动计算</p>
-              </fieldset>
 
               <button class="shell-toggle" id="shellToggle" type="button" aria-pressed="false">
                 <span class="shell-toggle-icon" aria-hidden="true">◌</span>
@@ -210,7 +180,6 @@
               <p class="card-kicker">计划完成度</p>
               <div class="plan-count"><strong id="planDoneCount">0</strong><span id="planTotalCount">/ 0 项</span></div>
               <p id="planGramSummary">已打卡计入 0 / 计划计入 0 克</p>
-              <p id="planCalorieSummary">计划预估热量 0 千卡</p>
             </div>
             <div class="plan-percent" id="planPercent" aria-label="计划完成 0%">0%</div>
           </article>
@@ -239,31 +208,6 @@
                 <input id="planWeight" type="number" min="0.1" max="9999" step="0.1" inputmode="decimal" placeholder="0" required />
                 <span>克</span>
               </div>
-              <fieldset class="energy-fieldset">
-                <legend class="field-label">包装上的热量标签 <span>可选填写</span></legend>
-                <div class="energy-basis-grid" id="planEnergyBasisGrid">
-                  <button class="energy-basis-option selected" type="button" data-energy-basis="per100">每 100 克</button>
-                  <button class="energy-basis-option" type="button" data-energy-basis="package">每份 / 包装</button>
-                </div>
-                <label class="field-label" for="planEnergyValue">标签热量</label>
-                <div class="energy-input-row">
-                  <div class="weight-input-wrap calorie-input-wrap">
-                    <input id="planEnergyValue" type="number" min="0" max="99999" step="0.1" inputmode="decimal" placeholder="0" />
-                  </div>
-                  <select class="energy-unit-select" id="planEnergyUnit" aria-label="计划热量单位">
-                    <option value="kcal">大卡 kcal</option>
-                    <option value="kj">千焦 kJ</option>
-                  </select>
-                </div>
-                <div class="package-weight-fields hidden" id="planPackageWeightFields">
-                  <label class="field-label" for="planPackageWeight">每份 / 包装净含量</label>
-                  <div class="weight-input-wrap calorie-input-wrap">
-                    <input id="planPackageWeight" type="number" min="0.1" max="9999" step="0.1" inputmode="decimal" placeholder="0" />
-                    <span>克</span>
-                  </div>
-                </div>
-                <p class="energy-preview" id="planEnergyPreview">填写标签热量后自动计算</p>
-              </fieldset>
               <div class="plan-type-preview" aria-live="polite">
                 <div>
                   <span>自动识别类型</span>
@@ -317,18 +261,6 @@
             <p class="settings-note" id="limitSaveMessage">默认 650 克，保存后立即应用到每天。</p>
           </article>
 
-          <article class="settings-card calorie-target-card">
-            <label class="field-label" for="dailyCalorieTarget">每日热量目标</label>
-            <div class="setting-row">
-              <div class="weight-input-wrap compact">
-                <input id="dailyCalorieTarget" type="number" min="1" max="99999" step="1" inputmode="numeric" />
-                <span>千卡</span>
-              </div>
-              <button class="secondary-button" id="saveCalorieTargetButton" type="button">保存</button>
-            </div>
-            <p class="settings-note" id="calorieTargetSaveMessage">默认 1600 千卡，保存后立即计算当天剩余热量。</p>
-          </article>
-
           <article class="settings-card">
             <div class="section-heading">
               <div>
@@ -342,7 +274,6 @@
               <div><span>酸奶、粥等</span><strong>实际重量 × 30%</strong></div>
               <div><span>蔬菜、水果</span><strong>实际净重 × 70%</strong></div>
             </div>
-            <p class="settings-note">热量按实际净重换算；标签为千焦时，App 会自动换算成大卡后合计。</p>
           </article>
 
           <article class="settings-card">
@@ -392,6 +323,6 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js?v=13" defer></script>
+    <script src="./app.js?v=14" defer></script>
   </body>
 </html>

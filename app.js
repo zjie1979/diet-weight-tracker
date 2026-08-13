@@ -47,6 +47,8 @@
   let selectedType = "solid";
   let selectedMeal = defaultMealForTime();
   let selectedPlanMeal = defaultMealForTime();
+  let selectedEnergyBasis = "per100";
+  let selectedPlanEnergyBasis = "per100";
   let editingId = null;
   let shellMode = false;
   let deferredInstallPrompt = null;
@@ -69,7 +71,21 @@
             const shell = hasShell && Number.isFinite(shellValue) && shellValue > 0 && shellValue < actual
               ? roundWeight(shellValue)
               : null;
-            const calorieValue = Number(record.calories);
+            const storedCalories = Number(record.calories);
+            const legacyCalories = Number.isFinite(storedCalories) && storedCalories > 0 ? roundWeight(storedCalories) : 0;
+            const energyBasis = record.energyBasis === "package" || record.energyBasis === "per100"
+              ? record.energyBasis
+              : (legacyCalories ? "package" : "per100");
+            const energyUnit = record.energyUnit === "kj" ? "kj" : "kcal";
+            const storedEnergyValue = Number(record.energyValue);
+            const energyValue = Number.isFinite(storedEnergyValue) && storedEnergyValue > 0
+              ? roundWeight(Math.min(storedEnergyValue, 99999))
+              : legacyCalories;
+            const edibleGrams = roundWeight(actual - (hasShell && shell ? shell : 0));
+            const storedReference = Number(record.energyReferenceGrams);
+            const energyReferenceGrams = energyBasis === "per100"
+              ? 100
+              : (Number.isFinite(storedReference) && storedReference > 0 ? roundWeight(Math.min(storedReference, 9999)) : edibleGrams);
             return {
               id: String(record.id || `${Date.now()}-${Math.random()}`),
               date: record.date,
@@ -77,7 +93,11 @@
               meal: MEALS[record.meal] ? record.meal : "snack",
               type: record.type,
               actual,
-              calories: Number.isFinite(calorieValue) && calorieValue > 0 ? roundWeight(Math.min(calorieValue, 9999)) : 0,
+              calories: energyValue ? calculateCalories(edibleGrams, energyBasis, energyUnit, energyValue, energyReferenceGrams) : 0,
+              energyBasis,
+              energyUnit,
+              energyValue,
+              energyReferenceGrams,
               hasShell,
               shell,
               createdAt: Number(record.createdAt) || Date.now()
@@ -87,15 +107,33 @@
           .filter((plan) => plan && /^\d{4}-\d{2}-\d{2}$/.test(plan.date) && String(plan.food || "").trim() && Number(plan.grams) > 0)
           .map((plan) => {
             const food = String(plan.food).trim().slice(0, 30);
-            const calorieValue = Number(plan.calories);
+            const grams = roundWeight(Math.min(Number(plan.grams), 9999));
+            const storedCalories = Number(plan.calories);
+            const legacyCalories = Number.isFinite(storedCalories) && storedCalories > 0 ? roundWeight(storedCalories) : 0;
+            const energyBasis = plan.energyBasis === "package" || plan.energyBasis === "per100"
+              ? plan.energyBasis
+              : (legacyCalories ? "package" : "per100");
+            const energyUnit = plan.energyUnit === "kj" ? "kj" : "kcal";
+            const storedEnergyValue = Number(plan.energyValue);
+            const energyValue = Number.isFinite(storedEnergyValue) && storedEnergyValue > 0
+              ? roundWeight(Math.min(storedEnergyValue, 99999))
+              : legacyCalories;
+            const storedReference = Number(plan.energyReferenceGrams);
+            const energyReferenceGrams = energyBasis === "per100"
+              ? 100
+              : (Number.isFinite(storedReference) && storedReference > 0 ? roundWeight(Math.min(storedReference, 9999)) : grams);
             return {
               id: String(plan.id || `${Date.now()}-${Math.random()}`),
               date: plan.date,
               food,
               meal: MEALS[plan.meal] ? plan.meal : "snack",
               type: inferPlanType(food),
-              grams: roundWeight(Math.min(Number(plan.grams), 9999)),
-              calories: Number.isFinite(calorieValue) && calorieValue > 0 ? roundWeight(Math.min(calorieValue, 9999)) : 0,
+              grams,
+              calories: energyValue ? calculateCalories(grams, energyBasis, energyUnit, energyValue, energyReferenceGrams) : 0,
+              energyBasis,
+              energyUnit,
+              energyValue,
+              energyReferenceGrams,
               completed: Boolean(plan.completed),
               completedAt: plan.completed && Number(plan.completedAt) ? Number(plan.completedAt) : null,
               createdAt: Number(plan.createdAt) || Date.now()
@@ -146,6 +184,14 @@
     return roundWeight(plan.grams * RULES[type].factor);
   }
 
+  function calculateCalories(grams, basis, unit, energyValue, referenceGrams) {
+    if (!Number.isFinite(grams) || grams <= 0 || !Number.isFinite(energyValue) || energyValue <= 0) return 0;
+    const reference = basis === "per100" ? 100 : Number(referenceGrams);
+    if (!Number.isFinite(reference) || reference <= 0) return 0;
+    const kcalValue = unit === "kj" ? energyValue / 4.184 : energyValue;
+    return roundWeight((grams / reference) * kcalValue);
+  }
+
   function formatDateHeading(dateString) {
     const date = parseDate(dateString);
     const today = todayString();
@@ -178,6 +224,8 @@
     renderHistory();
     renderPlans();
     updatePlanTypePreview();
+    updateEnergyPreview();
+    updatePlanEnergyPreview();
     el("dailyLimit").value = String(state.limit);
   }
 
@@ -385,6 +433,40 @@
     el("planCalculatedWeight").textContent = `${formatWeight(grams * rule.factor)} 克`;
   }
 
+  function updateEnergyPreview() {
+    const actual = Number(el("actualWeight").value) || 0;
+    const shell = shellMode ? (Number(el("shellWeight").value) || 0) : 0;
+    const net = Math.max(0, actual - shell);
+    const energyValue = Number(el("energyValue").value) || 0;
+    const reference = selectedEnergyBasis === "per100" ? 100 : Number(el("packageWeight").value);
+    if (!energyValue) {
+      el("energyPreview").textContent = "填写标签热量后自动计算";
+      return;
+    }
+    if (selectedEnergyBasis === "package" && (!Number.isFinite(reference) || reference <= 0)) {
+      el("energyPreview").textContent = "请填写每份 / 包装净含量";
+      return;
+    }
+    const calories = calculateCalories(net, selectedEnergyBasis, el("energyUnit").value, energyValue, reference);
+    el("energyPreview").textContent = `按净重 ${formatWeight(net)} 克计算，本项预估 ${formatWeight(calories)} 千卡`;
+  }
+
+  function updatePlanEnergyPreview() {
+    const grams = Number(el("planWeight").value) || 0;
+    const energyValue = Number(el("planEnergyValue").value) || 0;
+    const reference = selectedPlanEnergyBasis === "per100" ? 100 : Number(el("planPackageWeight").value);
+    if (!energyValue) {
+      el("planEnergyPreview").textContent = "填写标签热量后自动计算";
+      return;
+    }
+    if (selectedPlanEnergyBasis === "package" && (!Number.isFinite(reference) || reference <= 0)) {
+      el("planEnergyPreview").textContent = "请填写每份 / 包装净含量";
+      return;
+    }
+    const calories = calculateCalories(grams, selectedPlanEnergyBasis, el("planEnergyUnit").value, energyValue, reference);
+    el("planEnergyPreview").textContent = `按计划 ${formatWeight(grams)} 克计算，本项预估 ${formatWeight(calories)} 千卡`;
+  }
+
   function updatePreview() {
     const actual = Number(el("actualWeight").value) || 0;
     const shell = shellMode ? (Number(el("shellWeight").value) || 0) : 0;
@@ -397,6 +479,7 @@
       el("calculationLabel").textContent = "本次计入";
     }
     el("calculatedWeight").textContent = `${formatWeight(net * RULES[selectedType].factor)} 克`;
+    updateEnergyPreview();
   }
 
   function setShellMode(enabled) {
@@ -430,12 +513,29 @@
     el("planMealGrid").querySelectorAll(".meal-option").forEach((button) => button.classList.toggle("selected", button.dataset.meal === meal));
   }
 
+  function selectEnergyBasis(basis) {
+    if (basis !== "per100" && basis !== "package") return;
+    selectedEnergyBasis = basis;
+    el("energyBasisGrid").querySelectorAll(".energy-basis-option").forEach((button) => button.classList.toggle("selected", button.dataset.energyBasis === basis));
+    el("packageWeightFields").classList.toggle("hidden", basis !== "package");
+    updateEnergyPreview();
+  }
+
+  function selectPlanEnergyBasis(basis) {
+    if (basis !== "per100" && basis !== "package") return;
+    selectedPlanEnergyBasis = basis;
+    el("planEnergyBasisGrid").querySelectorAll(".energy-basis-option").forEach((button) => button.classList.toggle("selected", button.dataset.energyBasis === basis));
+    el("planPackageWeightFields").classList.toggle("hidden", basis !== "package");
+    updatePlanEnergyPreview();
+  }
+
   function submitEntry(event) {
     event.preventDefault();
     const name = el("foodName").value.trim();
     const actual = Number(el("actualWeight").value);
-    const calorieInput = el("estimatedCalories").value.trim();
-    const calories = calorieInput ? Number(calorieInput) : 0;
+    const energyInput = el("energyValue").value.trim();
+    const energyValue = energyInput ? Number(energyInput) : 0;
+    const energyUnit = el("energyUnit").value;
     if (!name) {
       el("formMessage").textContent = "请输入这次吃的食物名称。";
       el("foodName").focus();
@@ -450,9 +550,9 @@
       el("formMessage").textContent = "单条记录最多 9999 克，请检查输入。";
       return;
     }
-    if (!Number.isFinite(calories) || calories < 0 || calories > 9999) {
-      el("formMessage").textContent = "预估热量请输入 0 到 9999 千卡之间的数字。";
-      el("estimatedCalories").focus();
+    if (!Number.isFinite(energyValue) || energyValue < 0 || energyValue > 99999) {
+      el("formMessage").textContent = "标签热量请输入 0 到 99999 之间的数字。";
+      el("energyValue").focus();
       return;
     }
     const shellInput = el("shellWeight").value.trim();
@@ -462,6 +562,15 @@
       el("shellWeight").focus();
       return;
     }
+    const packageWeight = selectedEnergyBasis === "package" ? Number(el("packageWeight").value) : 100;
+    if (energyValue > 0 && selectedEnergyBasis === "package" && (!Number.isFinite(packageWeight) || packageWeight <= 0 || packageWeight > 9999)) {
+      el("formMessage").textContent = "请填写 0.1 到 9999 克之间的包装净含量。";
+      el("packageWeight").focus();
+      return;
+    }
+    const referenceGrams = selectedEnergyBasis === "per100" ? 100 : packageWeight;
+    const edibleGrams = roundWeight(actual - (shellMode && shell !== null ? shell : 0));
+    const calories = calculateCalories(edibleGrams, selectedEnergyBasis, energyUnit, energyValue, referenceGrams);
     if (editingId) {
       const record = state.records.find((item) => item.id === editingId);
       if (record) {
@@ -469,6 +578,10 @@
         record.meal = selectedMeal;
         record.actual = roundWeight(actual);
         record.calories = roundWeight(calories);
+        record.energyBasis = selectedEnergyBasis;
+        record.energyUnit = energyUnit;
+        record.energyValue = roundWeight(energyValue);
+        record.energyReferenceGrams = roundWeight(referenceGrams);
         record.type = selectedType;
         record.hasShell = shellMode;
         record.shell = shellMode && shell !== null ? roundWeight(shell) : null;
@@ -483,6 +596,10 @@
         type: selectedType,
         actual: roundWeight(actual),
         calories: roundWeight(calories),
+        energyBasis: selectedEnergyBasis,
+        energyUnit,
+        energyValue: roundWeight(energyValue),
+        energyReferenceGrams: roundWeight(referenceGrams),
         hasShell: shellMode,
         shell: shellMode && shell !== null ? roundWeight(shell) : null,
         createdAt: Date.now()
@@ -504,6 +621,7 @@
     setShellMode(false);
     selectType("solid");
     selectMeal(defaultMealForTime());
+    selectEnergyBasis("per100");
   }
 
   function editRecord(id, focusShell = false) {
@@ -512,10 +630,13 @@
     editingId = record.id;
     el("foodName").value = record.name || "";
     el("actualWeight").value = String(record.actual);
-    el("estimatedCalories").value = record.calories ? String(record.calories) : "";
     selectMeal(record.meal);
     setShellMode(record.hasShell);
     el("shellWeight").value = record.shell ? String(record.shell) : "";
+    el("energyValue").value = record.energyValue ? String(record.energyValue) : "";
+    el("energyUnit").value = record.energyUnit;
+    el("packageWeight").value = record.energyBasis === "package" && record.energyReferenceGrams ? String(record.energyReferenceGrams) : "";
+    selectEnergyBasis(record.energyBasis);
     el("formTitle").textContent = focusShell ? "补录壳的重量" : "修改这条记录";
     el("saveEntryButton").textContent = focusShell ? "保存并计算净重" : "保存修改";
     el("cancelEditButton").classList.remove("hidden");
@@ -540,8 +661,9 @@
     event.preventDefault();
     const food = el("planFood").value.trim();
     const grams = Number(el("planWeight").value);
-    const calorieInput = el("planCalories").value.trim();
-    const calories = calorieInput ? Number(calorieInput) : 0;
+    const energyInput = el("planEnergyValue").value.trim();
+    const energyValue = energyInput ? Number(energyInput) : 0;
+    const energyUnit = el("planEnergyUnit").value;
     if (!food) {
       el("planFormMessage").textContent = "请输入计划食物。";
       el("planFood").focus();
@@ -552,11 +674,19 @@
       el("planWeight").focus();
       return;
     }
-    if (!Number.isFinite(calories) || calories < 0 || calories > 9999) {
-      el("planFormMessage").textContent = "预估热量请输入 0 到 9999 千卡之间的数字。";
-      el("planCalories").focus();
+    if (!Number.isFinite(energyValue) || energyValue < 0 || energyValue > 99999) {
+      el("planFormMessage").textContent = "标签热量请输入 0 到 99999 之间的数字。";
+      el("planEnergyValue").focus();
       return;
     }
+    const packageWeight = selectedPlanEnergyBasis === "package" ? Number(el("planPackageWeight").value) : 100;
+    if (energyValue > 0 && selectedPlanEnergyBasis === "package" && (!Number.isFinite(packageWeight) || packageWeight <= 0 || packageWeight > 9999)) {
+      el("planFormMessage").textContent = "请填写 0.1 到 9999 克之间的包装净含量。";
+      el("planPackageWeight").focus();
+      return;
+    }
+    const referenceGrams = selectedPlanEnergyBasis === "per100" ? 100 : packageWeight;
+    const calories = calculateCalories(grams, selectedPlanEnergyBasis, energyUnit, energyValue, referenceGrams);
     state.plans.push({
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       date: planDate,
@@ -565,6 +695,10 @@
       type: inferPlanType(food),
       grams: roundWeight(grams),
       calories: roundWeight(calories),
+      energyBasis: selectedPlanEnergyBasis,
+      energyUnit,
+      energyValue: roundWeight(energyValue),
+      energyReferenceGrams: roundWeight(referenceGrams),
       completed: false,
       completedAt: null,
       createdAt: Date.now()
@@ -573,7 +707,9 @@
     el("planForm").reset();
     el("planFormMessage").textContent = "";
     selectPlanMeal(defaultMealForTime());
+    selectPlanEnergyBasis("per100");
     updatePlanTypePreview();
+    updatePlanEnergyPreview();
     renderPlans();
     showToast("已加入当天饮食计划");
   }
@@ -615,7 +751,9 @@
     el("planForm").reset();
     el("planFormMessage").textContent = "";
     selectPlanMeal(defaultMealForTime());
+    selectPlanEnergyBasis("per100");
     updatePlanTypePreview();
+    updatePlanEnergyPreview();
     renderPlanDate();
     renderPlans();
   }
@@ -645,7 +783,7 @@
   }
 
   function exportData() {
-    const payload = { app: "饮食重量记录", version: 8, exportedAt: new Date().toISOString(), data: state };
+    const payload = { app: "饮食重量记录", version: 9, exportedAt: new Date().toISOString(), data: state };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -685,7 +823,9 @@
     state.records = [];
     state.plans = [];
     el("planForm").reset();
+    selectPlanEnergyBasis("per100");
     updatePlanTypePreview();
+    updatePlanEnergyPreview();
     saveState();
     resetForm();
     renderAll();
@@ -712,8 +852,19 @@
       const button = event.target.closest(".meal-option");
       if (button) selectPlanMeal(button.dataset.meal);
     });
+    el("energyBasisGrid").addEventListener("click", (event) => {
+      const button = event.target.closest(".energy-basis-option");
+      if (button) selectEnergyBasis(button.dataset.energyBasis);
+    });
+    el("planEnergyBasisGrid").addEventListener("click", (event) => {
+      const button = event.target.closest(".energy-basis-option");
+      if (button) selectPlanEnergyBasis(button.dataset.energyBasis);
+    });
     el("actualWeight").addEventListener("input", updatePreview);
     el("shellWeight").addEventListener("input", updatePreview);
+    el("energyValue").addEventListener("input", updateEnergyPreview);
+    el("energyUnit").addEventListener("change", updateEnergyPreview);
+    el("packageWeight").addEventListener("input", updateEnergyPreview);
     el("shellToggle").addEventListener("click", () => setShellMode(!shellMode));
     el("entryForm").addEventListener("submit", submitEntry);
     el("cancelEditButton").addEventListener("click", resetForm);
@@ -726,7 +877,13 @@
     });
     el("planForm").addEventListener("submit", submitPlan);
     el("planFood").addEventListener("input", updatePlanTypePreview);
-    el("planWeight").addEventListener("input", updatePlanTypePreview);
+    el("planWeight").addEventListener("input", () => {
+      updatePlanTypePreview();
+      updatePlanEnergyPreview();
+    });
+    el("planEnergyValue").addEventListener("input", updatePlanEnergyPreview);
+    el("planEnergyUnit").addEventListener("change", updatePlanEnergyPreview);
+    el("planPackageWeight").addEventListener("input", updatePlanEnergyPreview);
     el("planList").addEventListener("click", (event) => {
       const button = event.target.closest("[data-plan-action]");
       if (!button) return;
@@ -758,7 +915,9 @@
         el("planForm").reset();
         el("planFormMessage").textContent = "";
         selectPlanMeal(defaultMealForTime());
+        selectPlanEnergyBasis("per100");
         updatePlanTypePreview();
+        updatePlanEnergyPreview();
         renderPlanDate();
         renderPlans();
       }
@@ -795,6 +954,8 @@
   setShellMode(false);
   selectMeal(defaultMealForTime());
   selectPlanMeal(defaultMealForTime());
+  selectEnergyBasis("per100");
+  selectPlanEnergyBasis("per100");
   renderAll();
 
   if ("serviceWorker" in navigator) {

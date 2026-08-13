@@ -121,6 +121,7 @@ button { color: inherit; }
 .weight-total strong { font-size: clamp(42px, 13vw, 62px); line-height: 1; letter-spacing: -3px; }
 .weight-total span { font-size: 16px; color: rgba(255,255,255,.72); }
 .remaining { margin: 0; font-size: 13px; color: rgba(255,255,255,.8); }
+.calorie-total { margin: 5px 0 0; color: rgba(255,255,255,.72); font-size: 11px; }
 .progress-ring {
   --progress: 0deg;
   flex: 0 0 116px;
@@ -163,6 +164,8 @@ button { color: inherit; }
 .weight-input-wrap span { color: var(--muted); font-size: 14px; }
 .weight-input-wrap.compact { width: 185px; height: 52px; }
 .weight-input-wrap.compact input { font-size: 21px; }
+.calorie-input-wrap { height: 52px; }
+.calorie-input-wrap input { font-size: 22px; }
 .shell-toggle {
   width: 100%;
   margin-top: 13px;
@@ -329,7 +332,8 @@ button { color: inherit; }
 .plan-count { margin: 7px 0 4px; display: flex; align-items: baseline; gap: 5px; }
 .plan-count strong { color: var(--green-dark); font-size: 38px; line-height: 1; letter-spacing: -1.8px; }
 .plan-count span { color: var(--muted); font-size: 14px; font-weight: 700; }
-.plan-summary-card p:last-child { margin: 0; color: var(--muted); font-size: 11px; }
+#planGramSummary, #planCalorieSummary { margin: 0; color: var(--muted); font-size: 11px; }
+#planCalorieSummary { margin-top: 4px; }
 .plan-percent {
   flex: 0 0 76px;
   height: 76px;

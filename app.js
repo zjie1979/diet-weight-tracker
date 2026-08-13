@@ -10,6 +10,13 @@
     produce: { label: "蔬菜 / 水果", factor: 0.7, symbol: "✦" }
   };
   const PLAN_TYPES = new Set(["solid", "liquid", "soft", "produce"]);
+  const MEALS = {
+    breakfast: { label: "早餐", symbol: "☀" },
+    lunch: { label: "午餐", symbol: "◐" },
+    dinner: { label: "晚餐", symbol: "☾" },
+    snack: { label: "加餐", symbol: "＋" }
+  };
+  const MEAL_ORDER = ["breakfast", "lunch", "dinner", "snack"];
   const SOFT_KEYWORDS = ["酸奶", "酸乳", "发酵乳", "粥", "稀饭", "米糊", "芝麻糊", "藕粉"];
   const LIQUID_KEYWORDS = ["牛奶", "豆浆", "果汁", "蔬菜汁", "咖啡", "奶茶", "饮料", "饮品", "可乐", "气泡水", "矿泉水"];
   const PRODUCE_KEYWORDS = [
@@ -38,6 +45,8 @@
   let currentDate = todayString();
   let planDate = todayString();
   let selectedType = "solid";
+  let selectedMeal = defaultMealForTime();
+  let selectedPlanMeal = defaultMealForTime();
   let editingId = null;
   let shellMode = false;
   let deferredInstallPrompt = null;
@@ -64,6 +73,7 @@
               id: String(record.id || `${Date.now()}-${Math.random()}`),
               date: record.date,
               name: String(record.name || "").slice(0, 30),
+              meal: MEALS[record.meal] ? record.meal : "snack",
               type: record.type,
               actual,
               hasShell,
@@ -79,6 +89,7 @@
               id: String(plan.id || `${Date.now()}-${Math.random()}`),
               date: plan.date,
               food,
+              meal: MEALS[plan.meal] ? plan.meal : "snack",
               type: inferPlanType(food),
               grams: roundWeight(Math.min(Number(plan.grams), 9999)),
               completed: Boolean(plan.completed),
@@ -107,7 +118,7 @@
   function recordsFor(date) {
     return state.records
       .filter((record) => record.date === date)
-      .sort((a, b) => b.createdAt - a.createdAt);
+      .sort((a, b) => MEAL_ORDER.indexOf(a.meal) - MEAL_ORDER.indexOf(b.meal) || b.createdAt - a.createdAt);
   }
 
   function totalsFor(date) {
@@ -122,7 +133,7 @@
   function plansFor(date) {
     return state.plans
       .filter((plan) => plan.date === date)
-      .sort((a, b) => Number(a.completed) - Number(b.completed) || a.createdAt - b.createdAt);
+      .sort((a, b) => MEAL_ORDER.indexOf(a.meal) - MEAL_ORDER.indexOf(b.meal) || Number(a.completed) - Number(b.completed) || a.createdAt - b.createdAt);
   }
 
   function effectivePlanWeight(plan) {
@@ -144,6 +155,14 @@
 
   function toDateString(date) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+
+  function defaultMealForTime() {
+    const hour = new Date().getHours();
+    if (hour < 10) return "breakfast";
+    if (hour < 14) return "lunch";
+    if (hour < 20) return "dinner";
+    return "snack";
   }
 
   function renderAll() {
@@ -198,7 +217,22 @@
       ? `净重暂计 ${formatWeight(actual)} 克`
       : `净重共 ${formatWeight(actual)} 克`;
     el("recordsEmpty").classList.toggle("hidden", records.length > 0);
-    el("recordsList").innerHTML = records.map((record) => {
+    el("recordsList").innerHTML = MEAL_ORDER.map((meal) => {
+      const mealRecords = records.filter((record) => record.meal === meal);
+      if (!mealRecords.length) return "";
+      const mealEffective = roundWeight(mealRecords.reduce((sum, record) => sum + effectiveWeight(record), 0));
+      return `
+        <section class="meal-group" aria-label="${MEALS[meal].label}">
+          <div class="meal-group-heading">
+            <div class="meal-group-title"><span aria-hidden="true">${MEALS[meal].symbol}</span><strong>${MEALS[meal].label}</strong></div>
+            <div class="meal-group-summary">${mealRecords.length} 项 · 计入 ${formatWeight(mealEffective)}g</div>
+          </div>
+          <div class="meal-group-list">${mealRecords.map((record) => renderRecordCard(record)).join("")}</div>
+        </section>`;
+    }).join("");
+  }
+
+  function renderRecordCard(record) {
       const rule = RULES[record.type];
       const safeName = escapeHTML(record.name || rule.label);
       const time = new Date(record.createdAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
@@ -209,7 +243,7 @@
           ? `${rule.label} · 带壳 ${formatWeight(record.actual)}g · 待补壳重 · ${time}`
           : `${rule.label} · 带壳 ${formatWeight(record.actual)}g - 壳 ${formatWeight(record.shell)}g = 净重 ${formatWeight(net)}g · ${time}`)
         : `${rule.label} · 净重 ${formatWeight(net)}g · ${time}`;
-      return `
+    return `
         <article class="record-item">
           <div class="record-icon" aria-hidden="true">${rule.symbol}</div>
           <div class="record-copy">
@@ -223,7 +257,6 @@
             <button class="mini-button delete" type="button" data-action="delete" data-id="${escapeHTML(record.id)}">删除</button>
           </div>
         </article>`;
-    }).join("");
   }
 
   function renderHistory() {
@@ -272,7 +305,22 @@
     el("planListTitle").textContent = `${plans.length} 项计划`;
     el("planListStatus").textContent = plans.length ? `已完成 ${completed.length} 项` : "还没有安排";
     el("planEmpty").classList.toggle("hidden", plans.length > 0);
-    el("planList").innerHTML = plans.map((plan) => {
+    el("planList").innerHTML = MEAL_ORDER.map((meal) => {
+      const mealPlans = plans.filter((plan) => plan.meal === meal);
+      if (!mealPlans.length) return "";
+      const mealGrams = roundWeight(mealPlans.reduce((sum, plan) => sum + effectivePlanWeight(plan), 0));
+      return `
+        <section class="meal-group" aria-label="${MEALS[meal].label}">
+          <div class="meal-group-heading">
+            <div class="meal-group-title"><span aria-hidden="true">${MEALS[meal].symbol}</span><strong>${MEALS[meal].label}</strong></div>
+            <div class="meal-group-summary">${mealPlans.length} 项 · 计划 ${formatWeight(mealGrams)}g</div>
+          </div>
+          <div class="meal-group-list">${mealPlans.map((plan) => renderPlanCard(plan)).join("")}</div>
+        </section>`;
+    }).join("");
+  }
+
+  function renderPlanCard(plan) {
       const safeFood = escapeHTML(plan.food);
       const planType = inferPlanType(plan.food);
       const typeRule = RULES[planType];
@@ -280,7 +328,7 @@
       const completedTime = plan.completedAt
         ? new Date(plan.completedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })
         : "";
-      return `
+    return `
         <article class="plan-item${plan.completed ? " completed" : ""}">
           <button class="plan-check-button" type="button" data-plan-action="toggle" data-id="${escapeHTML(plan.id)}" aria-pressed="${plan.completed}" aria-label="${plan.completed ? "取消打卡" : "打卡"} ${safeFood} ${formatWeight(plan.grams)}克">${plan.completed ? "✓" : "○"}</button>
           <div class="plan-item-copy">
@@ -293,7 +341,6 @@
             <button class="plan-delete-button" type="button" data-plan-action="delete" data-id="${escapeHTML(plan.id)}" aria-label="删除计划 ${safeFood}">删除</button>
           </div>
         </article>`;
-    }).join("");
   }
 
   function escapeHTML(value) {
@@ -362,6 +409,18 @@
     updatePreview();
   }
 
+  function selectMeal(meal) {
+    if (!MEALS[meal]) return;
+    selectedMeal = meal;
+    el("mealGrid").querySelectorAll(".meal-option").forEach((button) => button.classList.toggle("selected", button.dataset.meal === meal));
+  }
+
+  function selectPlanMeal(meal) {
+    if (!MEALS[meal]) return;
+    selectedPlanMeal = meal;
+    el("planMealGrid").querySelectorAll(".meal-option").forEach((button) => button.classList.toggle("selected", button.dataset.meal === meal));
+  }
+
   function submitEntry(event) {
     event.preventDefault();
     const name = el("foodName").value.trim();
@@ -391,6 +450,7 @@
       const record = state.records.find((item) => item.id === editingId);
       if (record) {
         record.name = name.slice(0, 30);
+        record.meal = selectedMeal;
         record.actual = roundWeight(actual);
         record.type = selectedType;
         record.hasShell = shellMode;
@@ -402,6 +462,7 @@
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         date: currentDate,
         name: name.slice(0, 30),
+        meal: selectedMeal,
         type: selectedType,
         actual: roundWeight(actual),
         hasShell: shellMode,
@@ -424,6 +485,7 @@
     el("cancelEditButton").classList.add("hidden");
     setShellMode(false);
     selectType("solid");
+    selectMeal(defaultMealForTime());
   }
 
   function editRecord(id, focusShell = false) {
@@ -432,6 +494,7 @@
     editingId = record.id;
     el("foodName").value = record.name || "";
     el("actualWeight").value = String(record.actual);
+    selectMeal(record.meal);
     setShellMode(record.hasShell);
     el("shellWeight").value = record.shell ? String(record.shell) : "";
     el("formTitle").textContent = focusShell ? "补录壳的重量" : "修改这条记录";
@@ -472,6 +535,7 @@
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       date: planDate,
       food: food.slice(0, 30),
+      meal: selectedPlanMeal,
       type: inferPlanType(food),
       grams: roundWeight(grams),
       completed: false,
@@ -481,6 +545,7 @@
     saveState();
     el("planForm").reset();
     el("planFormMessage").textContent = "";
+    selectPlanMeal(defaultMealForTime());
     updatePlanTypePreview();
     renderPlans();
     showToast("已加入当天饮食计划");
@@ -522,6 +587,7 @@
     planDate = toDateString(next);
     el("planForm").reset();
     el("planFormMessage").textContent = "";
+    selectPlanMeal(defaultMealForTime());
     updatePlanTypePreview();
     renderPlanDate();
     renderPlans();
@@ -552,7 +618,7 @@
   }
 
   function exportData() {
-    const payload = { app: "饮食重量记录", version: 6, exportedAt: new Date().toISOString(), data: state };
+    const payload = { app: "饮食重量记录", version: 7, exportedAt: new Date().toISOString(), data: state };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -611,6 +677,14 @@
       const button = event.target.closest(".type-option");
       if (button) selectType(button.dataset.type);
     });
+    el("mealGrid").addEventListener("click", (event) => {
+      const button = event.target.closest(".meal-option");
+      if (button) selectMeal(button.dataset.meal);
+    });
+    el("planMealGrid").addEventListener("click", (event) => {
+      const button = event.target.closest(".meal-option");
+      if (button) selectPlanMeal(button.dataset.meal);
+    });
     el("actualWeight").addEventListener("input", updatePreview);
     el("shellWeight").addEventListener("input", updatePreview);
     el("shellToggle").addEventListener("click", () => setShellMode(!shellMode));
@@ -656,6 +730,7 @@
         planDate = event.target.value;
         el("planForm").reset();
         el("planFormMessage").textContent = "";
+        selectPlanMeal(defaultMealForTime());
         updatePlanTypePreview();
         renderPlanDate();
         renderPlans();
@@ -691,6 +766,8 @@
 
   bindEvents();
   setShellMode(false);
+  selectMeal(defaultMealForTime());
+  selectPlanMeal(defaultMealForTime());
   renderAll();
 
   if ("serviceWorker" in navigator) {

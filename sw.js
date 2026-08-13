@@ -1,4 +1,4 @@
-const RESOURCE_VERSION = "12";
+const RESOURCE_VERSION = "13";
 const CACHE_NAME = `diet-weight-pwa-v${RESOURCE_VERSION}`;
 const APP_SHELL = [
   "./",

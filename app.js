@@ -69,6 +69,7 @@
             const shell = hasShell && Number.isFinite(shellValue) && shellValue > 0 && shellValue < actual
               ? roundWeight(shellValue)
               : null;
+            const calorieValue = Number(record.calories);
             return {
               id: String(record.id || `${Date.now()}-${Math.random()}`),
               date: record.date,
@@ -76,6 +77,7 @@
               meal: MEALS[record.meal] ? record.meal : "snack",
               type: record.type,
               actual,
+              calories: Number.isFinite(calorieValue) && calorieValue > 0 ? roundWeight(Math.min(calorieValue, 9999)) : 0,
               hasShell,
               shell,
               createdAt: Number(record.createdAt) || Date.now()
@@ -85,6 +87,7 @@
           .filter((plan) => plan && /^\d{4}-\d{2}-\d{2}$/.test(plan.date) && String(plan.food || "").trim() && Number(plan.grams) > 0)
           .map((plan) => {
             const food = String(plan.food).trim().slice(0, 30);
+            const calorieValue = Number(plan.calories);
             return {
               id: String(plan.id || `${Date.now()}-${Math.random()}`),
               date: plan.date,
@@ -92,6 +95,7 @@
               meal: MEALS[plan.meal] ? plan.meal : "snack",
               type: inferPlanType(food),
               grams: roundWeight(Math.min(Number(plan.grams), 9999)),
+              calories: Number.isFinite(calorieValue) && calorieValue > 0 ? roundWeight(Math.min(calorieValue, 9999)) : 0,
               completed: Boolean(plan.completed),
               completedAt: plan.completed && Number(plan.completedAt) ? Number(plan.completedAt) : null,
               createdAt: Number(plan.createdAt) || Date.now()
@@ -126,7 +130,8 @@
     return {
       records,
       actual: roundWeight(records.reduce((sum, record) => sum + netWeight(record), 0)),
-      effective: roundWeight(records.reduce((sum, record) => sum + effectiveWeight(record), 0))
+      effective: roundWeight(records.reduce((sum, record) => sum + effectiveWeight(record), 0)),
+      calories: roundWeight(records.reduce((sum, record) => sum + record.calories, 0))
     };
   }
 
@@ -193,7 +198,7 @@
   }
 
   function renderProgress() {
-    const { effective } = totalsFor(currentDate);
+    const { effective, calories } = totalsFor(currentDate);
     const remaining = roundWeight(state.limit - effective);
     const percent = state.limit ? Math.round((effective / state.limit) * 100) : 0;
     const angle = Math.min(percent, 100) * 3.6;
@@ -202,6 +207,7 @@
     el("progressPercent").textContent = `${percent}%`;
     el("progressRing").style.setProperty("--progress", `${angle}deg`);
     el("progressRing").setAttribute("aria-label", `已计入 ${formatWeight(effective)} 克，占每日上限的 ${percent}%`);
+    el("calorieTotal").textContent = `今日预估热量 ${formatWeight(calories)} 千卡`;
     const isOver = remaining < 0;
     el("progressCard").classList.toggle("over", isOver);
     el("remainingText").textContent = isOver
@@ -250,7 +256,7 @@
             <strong>${safeName}</strong>
             <span>${detail}</span>
           </div>
-          <div class="record-weight"><strong>${formatWeight(effectiveWeight(record))}g</strong><span>${pendingShell ? "暂计重量" : "计入重量"}</span></div>
+          <div class="record-weight"><strong>${formatWeight(effectiveWeight(record))}g</strong><span>${pendingShell ? "暂计重量" : "计入重量"}${record.calories ? ` · ${formatWeight(record.calories)}千卡` : ""}</span></div>
           <div class="record-actions">
             ${record.hasShell ? `<button class="mini-button shell-action" type="button" data-action="shell" data-id="${escapeHTML(record.id)}">${pendingShell ? "补壳重" : "改壳重"}</button>` : ""}
             <button class="mini-button" type="button" data-action="edit" data-id="${escapeHTML(record.id)}">修改</button>
@@ -283,7 +289,7 @@
         <button class="history-item${over ? " over" : ""}" type="button" data-date="${day.dateString}" style="--bar:${percent}%">
           <span class="history-item-top">
             <span class="history-date"><strong>${heading.primary}</strong><span>${heading.secondary} · ${day.records.length} 条</span></span>
-            <span class="history-value"><strong>${formatWeight(day.effective)} 克</strong><span>${over ? `超出 ${formatWeight(day.effective - state.limit)} 克` : `剩余 ${formatWeight(state.limit - day.effective)} 克`}</span></span>
+            <span class="history-value"><strong>${formatWeight(day.effective)} 克</strong><span>预估 ${formatWeight(day.calories)} 千卡 · ${over ? `超出 ${formatWeight(day.effective - state.limit)} 克` : `剩余 ${formatWeight(state.limit - day.effective)} 克`}</span></span>
           </span>
           <span class="history-bar"><span></span></span>
         </button>`;
@@ -295,11 +301,14 @@
     const completed = plans.filter((plan) => plan.completed);
     const totalGrams = roundWeight(plans.reduce((sum, plan) => sum + effectivePlanWeight(plan), 0));
     const completedGrams = roundWeight(completed.reduce((sum, plan) => sum + effectivePlanWeight(plan), 0));
+    const totalCalories = roundWeight(plans.reduce((sum, plan) => sum + plan.calories, 0));
+    const completedCalories = roundWeight(completed.reduce((sum, plan) => sum + plan.calories, 0));
     const percent = plans.length ? Math.round((completed.length / plans.length) * 100) : 0;
 
     el("planDoneCount").textContent = String(completed.length);
     el("planTotalCount").textContent = `/ ${plans.length} 项`;
     el("planGramSummary").textContent = `已打卡计入 ${formatWeight(completedGrams)} / 计划计入 ${formatWeight(totalGrams)} 克`;
+    el("planCalorieSummary").textContent = `已打卡预估 ${formatWeight(completedCalories)} / 计划预估 ${formatWeight(totalCalories)} 千卡`;
     el("planPercent").textContent = `${percent}%`;
     el("planPercent").setAttribute("aria-label", `计划完成 ${percent}%`);
     el("planListTitle").textContent = `${plans.length} 项计划`;
@@ -337,7 +346,7 @@
           </div>
           <div class="plan-item-actions">
             <strong>计入 ${formatWeight(countedWeight)}g</strong>
-            <span>实际 ${formatWeight(plan.grams)}g</span>
+            <span>实际 ${formatWeight(plan.grams)}g${plan.calories ? ` · ${formatWeight(plan.calories)}千卡` : ""}</span>
             <button class="plan-delete-button" type="button" data-plan-action="delete" data-id="${escapeHTML(plan.id)}" aria-label="删除计划 ${safeFood}">删除</button>
           </div>
         </article>`;
@@ -425,6 +434,8 @@
     event.preventDefault();
     const name = el("foodName").value.trim();
     const actual = Number(el("actualWeight").value);
+    const calorieInput = el("estimatedCalories").value.trim();
+    const calories = calorieInput ? Number(calorieInput) : 0;
     if (!name) {
       el("formMessage").textContent = "请输入这次吃的食物名称。";
       el("foodName").focus();
@@ -437,6 +448,11 @@
     }
     if (actual > 9999) {
       el("formMessage").textContent = "单条记录最多 9999 克，请检查输入。";
+      return;
+    }
+    if (!Number.isFinite(calories) || calories < 0 || calories > 9999) {
+      el("formMessage").textContent = "预估热量请输入 0 到 9999 千卡之间的数字。";
+      el("estimatedCalories").focus();
       return;
     }
     const shellInput = el("shellWeight").value.trim();
@@ -452,6 +468,7 @@
         record.name = name.slice(0, 30);
         record.meal = selectedMeal;
         record.actual = roundWeight(actual);
+        record.calories = roundWeight(calories);
         record.type = selectedType;
         record.hasShell = shellMode;
         record.shell = shellMode && shell !== null ? roundWeight(shell) : null;
@@ -465,6 +482,7 @@
         meal: selectedMeal,
         type: selectedType,
         actual: roundWeight(actual),
+        calories: roundWeight(calories),
         hasShell: shellMode,
         shell: shellMode && shell !== null ? roundWeight(shell) : null,
         createdAt: Date.now()
@@ -494,6 +512,7 @@
     editingId = record.id;
     el("foodName").value = record.name || "";
     el("actualWeight").value = String(record.actual);
+    el("estimatedCalories").value = record.calories ? String(record.calories) : "";
     selectMeal(record.meal);
     setShellMode(record.hasShell);
     el("shellWeight").value = record.shell ? String(record.shell) : "";
@@ -521,6 +540,8 @@
     event.preventDefault();
     const food = el("planFood").value.trim();
     const grams = Number(el("planWeight").value);
+    const calorieInput = el("planCalories").value.trim();
+    const calories = calorieInput ? Number(calorieInput) : 0;
     if (!food) {
       el("planFormMessage").textContent = "请输入计划食物。";
       el("planFood").focus();
@@ -531,6 +552,11 @@
       el("planWeight").focus();
       return;
     }
+    if (!Number.isFinite(calories) || calories < 0 || calories > 9999) {
+      el("planFormMessage").textContent = "预估热量请输入 0 到 9999 千卡之间的数字。";
+      el("planCalories").focus();
+      return;
+    }
     state.plans.push({
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       date: planDate,
@@ -538,6 +564,7 @@
       meal: selectedPlanMeal,
       type: inferPlanType(food),
       grams: roundWeight(grams),
+      calories: roundWeight(calories),
       completed: false,
       completedAt: null,
       createdAt: Date.now()
@@ -618,7 +645,7 @@
   }
 
   function exportData() {
-    const payload = { app: "饮食重量记录", version: 7, exportedAt: new Date().toISOString(), data: state };
+    const payload = { app: "饮食重量记录", version: 8, exportedAt: new Date().toISOString(), data: state };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");

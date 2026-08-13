@@ -55,13 +55,15 @@
   let toastTimer = null;
 
   function loadState() {
-    const fallback = { limit: 650, records: [], plans: [] };
+    const fallback = { limit: 650, calorieTarget: 1600, records: [], plans: [] };
     try {
       const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
       if (!parsed || !Array.isArray(parsed.records)) return fallback;
       const limit = Number(parsed.limit);
+      const calorieTarget = Number(parsed.calorieTarget);
       return {
         limit: Number.isFinite(limit) && limit > 0 ? Math.min(limit, 9999) : 650,
+        calorieTarget: Number.isFinite(calorieTarget) && calorieTarget > 0 ? Math.min(calorieTarget, 99999) : 1600,
         records: parsed.records
           .filter((record) => record && RULES[record.type] && Number(record.actual) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(record.date))
           .map((record) => {
@@ -227,6 +229,7 @@
     updateEnergyPreview();
     updatePlanEnergyPreview();
     el("dailyLimit").value = String(state.limit);
+    el("dailyCalorieTarget").value = String(state.calorieTarget);
   }
 
   function renderDate() {
@@ -255,7 +258,12 @@
     el("progressPercent").textContent = `${percent}%`;
     el("progressRing").style.setProperty("--progress", `${angle}deg`);
     el("progressRing").setAttribute("aria-label", `已计入 ${formatWeight(effective)} 克，占每日上限的 ${percent}%`);
-    el("calorieTotal").textContent = `今日预估热量 ${formatWeight(calories)} 千卡`;
+    const calorieRemaining = roundWeight(state.calorieTarget - calories);
+    el("consumedCalories").textContent = formatWeight(calories);
+    el("calorieRemaining").textContent = calorieRemaining < 0
+      ? `已超出 ${formatWeight(Math.abs(calorieRemaining))} 千卡`
+      : `剩余 ${formatWeight(calorieRemaining)} 千卡`;
+    el("calorieRemaining").classList.toggle("over", calorieRemaining < 0);
     const isOver = remaining < 0;
     el("progressCard").classList.toggle("over", isOver);
     el("remainingText").textContent = isOver
@@ -782,8 +790,21 @@
     showToast("每日上限已更新");
   }
 
+  function saveCalorieTarget() {
+    const nextTarget = Number(el("dailyCalorieTarget").value);
+    if (!Number.isFinite(nextTarget) || nextTarget < 1 || nextTarget > 99999) {
+      el("calorieTargetSaveMessage").textContent = "请输入 1 到 99999 千卡之间的目标。";
+      return;
+    }
+    state.calorieTarget = roundWeight(nextTarget);
+    saveState();
+    renderAll();
+    el("calorieTargetSaveMessage").textContent = `已保存：每日热量目标 ${formatWeight(state.calorieTarget)} 千卡。`;
+    showToast("每日热量目标已更新");
+  }
+
   function exportData() {
-    const payload = { app: "饮食重量记录", version: 9, exportedAt: new Date().toISOString(), data: state };
+    const payload = { app: "饮食重量记录", version: 10, exportedAt: new Date().toISOString(), data: state };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -932,6 +953,7 @@
       switchView("today");
     });
     el("saveLimitButton").addEventListener("click", saveLimit);
+    el("saveCalorieTargetButton").addEventListener("click", saveCalorieTarget);
     el("exportButton").addEventListener("click", exportData);
     el("importInput").addEventListener("change", importData);
     el("clearDataButton").addEventListener("click", clearData);

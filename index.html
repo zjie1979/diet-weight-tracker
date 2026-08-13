@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="饮食重量" />
     <meta name="description" content="制定每日饮食计划、逐项打卡，并按食物类型折算记录饮食重量。" />
-    <link rel="manifest" href="./manifest.webmanifest?v=8" />
-    <link rel="apple-touch-icon" href="./icon-180.png?v=8" />
-    <link rel="icon" href="./icon-192.png?v=8" />
-    <link rel="stylesheet" href="./styles.css?v=8" />
+    <link rel="manifest" href="./manifest.webmanifest?v=9" />
+    <link rel="apple-touch-icon" href="./icon-180.png?v=9" />
+    <link rel="icon" href="./icon-192.png?v=9" />
+    <link rel="stylesheet" href="./styles.css?v=9" />
     <title>饮食重量记录</title>
   </head>
   <body>
@@ -97,9 +97,13 @@
                     <span class="type-icon liquid-icon">◒</span>
                     <span><strong>液体</strong><small>计入 10%</small></span>
                   </button>
-                  <button class="type-option wide" type="button" data-type="soft">
+                  <button class="type-option" type="button" data-type="soft">
                     <span class="type-icon soft-icon">◉</span>
                     <span><strong>酸奶 / 粥</strong><small>计入 30%</small></span>
+                  </button>
+                  <button class="type-option" type="button" data-type="produce">
+                    <span class="type-icon produce-icon">✦</span>
+                    <span><strong>蔬菜 / 水果</strong><small>计入 70%</small></span>
                   </button>
                 </div>
               </fieldset>
@@ -195,7 +199,7 @@
                   <strong id="planCalculatedWeight">0 克</strong>
                 </div>
               </div>
-              <p class="plan-type-help">自动识别为固体、液体或酸奶/粥；无法明确判断时按固体。</p>
+              <p class="plan-type-help">自动识别为固体、液体、酸奶/粥或蔬菜/水果；无法明确判断时按固体。</p>
               <p class="plan-note">计划打卡只记录完成状态，不会重复计入当天饮食重量。</p>
               <p class="form-message" id="planFormMessage" role="alert"></p>
               <button class="primary-button" type="submit">加入计划</button>
@@ -249,6 +253,7 @@
               <div><span>固体食物</span><strong>实际重量 × 100%</strong></div>
               <div><span>液体</span><strong>实际重量 × 10%</strong></div>
               <div><span>酸奶、粥等</span><strong>实际重量 × 30%</strong></div>
+              <div><span>蔬菜、水果</span><strong>实际净重 × 70%</strong></div>
             </div>
           </article>
 
@@ -299,6 +304,6 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js?v=8" defer></script>
+    <script src="./app.js?v=9" defer></script>
   </body>
 </html>

@@ -121,7 +121,9 @@ button { color: inherit; }
 .weight-total strong { font-size: clamp(42px, 13vw, 62px); line-height: 1; letter-spacing: -3px; }
 .weight-total span { font-size: 16px; color: rgba(255,255,255,.72); }
 .remaining { margin: 0; font-size: 13px; color: rgba(255,255,255,.8); }
-.calorie-total { margin: 5px 0 0; color: rgba(255,255,255,.72); font-size: 11px; }
+.calorie-total { margin: 6px 0 0; display: flex; flex-wrap: wrap; gap: 3px 10px; color: rgba(255,255,255,.72); font-size: 11px; }
+.calorie-total strong { color: white; font-size: 12px; }
+.calorie-total .over { color: #ffe0c8; font-weight: 750; }
 .progress-ring {
   --progress: 0deg;
   flex: 0 0 116px;
@@ -434,6 +436,7 @@ button { color: inherit; }
 .settings-card { box-shadow: 0 10px 32px rgba(31,66,54,.07); }
 .settings-card:first-of-type { margin-top: 0; }
 .accent-card { background: linear-gradient(135deg, #ecf5ef, #f8f9eb); border-color: #d7e7db; }
+.calorie-target-card { background: linear-gradient(135deg, #fff8ed, #fbf5e7); border-color: #eee0c9; }
 .settings-note { margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .rule-list { margin-top: 14px; }
 .rule-list div { padding: 12px 0; border-top: 1px solid #edf0eb; display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }

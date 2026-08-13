@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="饮食重量" />
     <meta name="description" content="制定每日饮食计划、逐项打卡，并按食物类型折算记录饮食重量。" />
-    <link rel="manifest" href="./manifest.webmanifest?v=12" />
-    <link rel="apple-touch-icon" href="./icon-180.png?v=12" />
-    <link rel="icon" href="./icon-192.png?v=12" />
-    <link rel="stylesheet" href="./styles.css?v=12" />
+    <link rel="manifest" href="./manifest.webmanifest?v=13" />
+    <link rel="apple-touch-icon" href="./icon-180.png?v=13" />
+    <link rel="icon" href="./icon-192.png?v=13" />
+    <link rel="stylesheet" href="./styles.css?v=13" />
     <title>饮食重量记录</title>
   </head>
   <body>
@@ -43,7 +43,10 @@
               <p class="card-kicker">今日已计入</p>
               <div class="weight-total"><strong id="usedWeight">0</strong><span>克</span></div>
               <p class="remaining" id="remainingText">还可以计入 650 克</p>
-              <p class="calorie-total" id="calorieTotal">今日预估热量 0 千卡</p>
+              <p class="calorie-total" id="calorieTotal">
+                <span>已摄入 <strong id="consumedCalories">0</strong> 千卡</span>
+                <span id="calorieRemaining">剩余 1600 千卡</span>
+              </p>
             </div>
             <div class="progress-ring" id="progressRing" role="img" aria-label="饮食重量完成进度">
               <div class="ring-center">
@@ -314,6 +317,18 @@
             <p class="settings-note" id="limitSaveMessage">默认 650 克，保存后立即应用到每天。</p>
           </article>
 
+          <article class="settings-card calorie-target-card">
+            <label class="field-label" for="dailyCalorieTarget">每日热量目标</label>
+            <div class="setting-row">
+              <div class="weight-input-wrap compact">
+                <input id="dailyCalorieTarget" type="number" min="1" max="99999" step="1" inputmode="numeric" />
+                <span>千卡</span>
+              </div>
+              <button class="secondary-button" id="saveCalorieTargetButton" type="button">保存</button>
+            </div>
+            <p class="settings-note" id="calorieTargetSaveMessage">默认 1600 千卡，保存后立即计算当天剩余热量。</p>
+          </article>
+
           <article class="settings-card">
             <div class="section-heading">
               <div>
@@ -377,6 +392,6 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js?v=12" defer></script>
+    <script src="./app.js?v=13" defer></script>
   </body>
 </html>

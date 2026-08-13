@@ -7,11 +7,20 @@
     liquid: { label: "液体", factor: 0.1, symbol: "◒" },
     nuts: { label: "坚果", factor: 3, symbol: "◆" },
     soft: { label: "酸奶 / 粥", factor: 0.3, symbol: "◉" },
-    produce: { label: "水果 / 蔬菜", factor: 0.5, symbol: "✦" }
+    produce: { label: "蔬菜 / 水果", factor: 0.7, symbol: "✦" }
   };
-  const PLAN_TYPES = new Set(["solid", "liquid", "soft"]);
+  const PLAN_TYPES = new Set(["solid", "liquid", "soft", "produce"]);
   const SOFT_KEYWORDS = ["酸奶", "酸乳", "发酵乳", "粥", "稀饭", "米糊", "芝麻糊", "藕粉"];
-  const LIQUID_KEYWORDS = ["牛奶", "豆浆", "果汁", "咖啡", "奶茶", "饮料", "饮品", "可乐", "气泡水", "矿泉水"];
+  const LIQUID_KEYWORDS = ["牛奶", "豆浆", "果汁", "蔬菜汁", "咖啡", "奶茶", "饮料", "饮品", "可乐", "气泡水", "矿泉水"];
+  const PRODUCE_KEYWORDS = [
+    "蔬菜", "水果", "苹果", "香蕉", "橙子", "橘子", "梨", "桃", "葡萄", "西瓜", "哈密瓜", "香瓜",
+    "草莓", "蓝莓", "樱桃", "车厘子", "猕猴桃", "火龙果", "芒果", "菠萝", "凤梨", "柚子", "柠檬",
+    "椰子", "荔枝", "龙眼", "桂圆", "山竹", "榴莲", "枇杷", "石榴", "杨梅", "柿子", "百香果", "牛油果",
+    "青菜", "白菜", "生菜", "菠菜", "油麦菜", "空心菜", "芹菜", "韭菜", "莴笋", "西兰花", "花菜", "菜花",
+    "黄瓜", "冬瓜", "南瓜", "丝瓜", "苦瓜", "茄子", "番茄", "西红柿", "土豆", "洋葱", "胡萝卜", "萝卜",
+    "山药", "玉米", "豆角", "四季豆", "豌豆", "蘑菇", "香菇", "菌菇", "木耳", "莲藕", "芦笋", "彩椒",
+    "青椒", "辣椒", "娃娃菜", "芥蓝", "芥菜", "紫甘蓝", "包菜", "甘蓝"
+  ];
 
   const el = (id) => document.getElementById(id);
   const todayString = () => {
@@ -70,7 +79,7 @@
               id: String(plan.id || `${Date.now()}-${Math.random()}`),
               date: plan.date,
               food,
-              type: PLAN_TYPES.has(plan.type) ? plan.type : inferPlanType(food),
+              type: inferPlanType(food),
               grams: roundWeight(Math.min(Number(plan.grams), 9999)),
               completed: Boolean(plan.completed),
               completedAt: plan.completed && Number(plan.completedAt) ? Number(plan.completedAt) : null,
@@ -117,7 +126,7 @@
   }
 
   function effectivePlanWeight(plan) {
-    const type = PLAN_TYPES.has(plan.type) ? plan.type : inferPlanType(plan.food);
+    const type = inferPlanType(plan.food);
     return roundWeight(plan.grams * RULES[type].factor);
   }
 
@@ -265,7 +274,7 @@
     el("planEmpty").classList.toggle("hidden", plans.length > 0);
     el("planList").innerHTML = plans.map((plan) => {
       const safeFood = escapeHTML(plan.food);
-      const planType = PLAN_TYPES.has(plan.type) ? plan.type : inferPlanType(plan.food);
+      const planType = inferPlanType(plan.food);
       const typeRule = RULES[planType];
       const countedWeight = effectivePlanWeight(plan);
       const completedTime = plan.completedAt
@@ -301,7 +310,9 @@
       || normalized.endsWith("汤")
       || normalized.endsWith("茶")
       || normalized.endsWith("酒")
+      || normalized.endsWith("汁")
     ) return "liquid";
+    if (PRODUCE_KEYWORDS.some((keyword) => normalized.includes(keyword))) return "produce";
     return "solid";
   }
 
@@ -541,7 +552,7 @@
   }
 
   function exportData() {
-    const payload = { app: "饮食重量记录", version: 5, exportedAt: new Date().toISOString(), data: state };
+    const payload = { app: "饮食重量记录", version: 6, exportedAt: new Date().toISOString(), data: state };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");

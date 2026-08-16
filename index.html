@@ -8,10 +8,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="饮食重量" />
     <meta name="description" content="制定每日饮食计划、逐项打卡，并按食物类型折算记录饮食重量。" />
-    <link rel="manifest" href="./manifest.webmanifest?v=14" />
-    <link rel="apple-touch-icon" href="./icon-180.png?v=14" />
-    <link rel="icon" href="./icon-192.png?v=14" />
-    <link rel="stylesheet" href="./styles.css?v=14" />
+    <link rel="manifest" href="./manifest.webmanifest?v=17" />
+    <link rel="apple-touch-icon" href="./icon-180.png?v=17" />
+    <link rel="icon" href="./icon-192.png?v=17" />
+    <link rel="stylesheet" href="./styles.css?v=17" />
     <title>饮食重量记录</title>
   </head>
   <body>
@@ -242,6 +242,134 @@
           </section>
         </section>
 
+        <section class="view" id="weightView" data-view="weight">
+          <div class="page-heading">
+            <p class="eyebrow">早晚各记一次</p>
+            <h2>体重记录</h2>
+            <p>记录每天早晚体重，单位统一使用斤，并自动计算早晚变化。</p>
+          </div>
+
+          <div class="date-switcher" aria-label="选择体重记录日期">
+            <button class="date-arrow" id="weightPreviousDayButton" type="button" aria-label="体重前一天">‹</button>
+            <button class="date-button" id="weightDateButton" type="button">
+              <span id="weightDatePrimary">今天</span>
+              <small id="weightDateSecondary"></small>
+            </button>
+            <button class="date-arrow" id="weightNextDayButton" type="button" aria-label="体重后一天">›</button>
+            <input id="weightDateInput" type="date" aria-label="选择体重日期" />
+          </div>
+
+          <article class="body-weight-summary">
+            <div><span>早上</span><strong id="morningWeightSummary">--</strong><small>斤</small></div>
+            <div><span>晚上</span><strong id="eveningWeightSummary">--</strong><small>斤</small></div>
+            <div id="weightDifferenceBox"><span>早晚差</span><strong id="weightDifferenceSummary">--</strong><small>斤</small></div>
+          </article>
+
+          <article class="entry-card weight-entry-card">
+            <div class="section-heading">
+              <div>
+                <p class="card-kicker">当天称重</p>
+                <h2>记录早晚体重</h2>
+              </div>
+            </div>
+            <form id="bodyWeightForm" novalidate>
+              <div class="body-weight-input-grid">
+                <div>
+                  <label class="field-label" for="morningBodyWeight">早上体重</label>
+                  <div class="weight-input-wrap body-weight-input">
+                    <input id="morningBodyWeight" type="number" min="30" max="600" step="0.1" inputmode="decimal" placeholder="可稍后补" />
+                    <span>斤</span>
+                  </div>
+                </div>
+                <div>
+                  <label class="field-label" for="eveningBodyWeight">晚上体重</label>
+                  <div class="weight-input-wrap body-weight-input">
+                    <input id="eveningBodyWeight" type="number" min="30" max="600" step="0.1" inputmode="decimal" placeholder="可稍后补" />
+                    <span>斤</span>
+                  </div>
+                </div>
+              </div>
+              <p class="body-weight-preview" id="bodyWeightPreview">早晚至少填写一个，另一个可以之后补录。</p>
+              <p class="form-message" id="bodyWeightMessage" role="alert"></p>
+              <div class="weight-form-actions">
+                <button class="primary-button" id="saveBodyWeightButton" type="submit">保存当天体重</button>
+                <button class="danger-button hidden" id="deleteBodyWeightButton" type="button">删除当天体重</button>
+              </div>
+            </form>
+          </article>
+
+          <article class="settings-card forecast-card">
+            <div class="section-heading">
+              <div>
+                <p class="card-kicker">固定预估线</p>
+                <h3>每天减少 0.4 斤</h3>
+              </div>
+            </div>
+            <p class="forecast-note">预估只按起始体重和日期计算，不会跟随每天的实际体重改变。</p>
+            <div class="forecast-input-grid">
+              <div>
+                <label class="field-label" for="forecastStartWeight">预估起始体重</label>
+                <div class="weight-input-wrap body-weight-input">
+                  <input id="forecastStartWeight" type="number" min="30" max="600" step="0.1" inputmode="decimal" placeholder="例如 120" />
+                  <span>斤</span>
+                </div>
+              </div>
+              <div>
+                <label class="field-label" for="forecastStartDate">起始日期</label>
+                <input class="text-input forecast-date-input" id="forecastStartDate" type="date" />
+              </div>
+            </div>
+            <button class="secondary-button forecast-save-button" id="saveForecastButton" type="button">保存固定预估</button>
+            <p class="form-message" id="forecastMessage" role="alert"></p>
+            <div class="forecast-results">
+              <div><span>今天预估</span><strong id="todayForecastWeight">--</strong><small>斤</small></div>
+              <div><span>一周后预估</span><strong id="weekForecastWeight">--</strong><small>斤</small></div>
+            </div>
+          </article>
+
+          <button class="chart-entry-button" id="openWeightChartButton" type="button">
+            <span class="chart-entry-icon" aria-hidden="true">⌁</span>
+            <span><strong>查看体重曲线</strong><small>早上、晚上和固定预估分开显示</small></span>
+            <span aria-hidden="true">›</span>
+          </button>
+
+          <section class="records-section weight-history-section">
+            <div class="section-heading records-heading">
+              <div>
+                <p class="card-kicker">最近记录</p>
+                <h2>早晚体重</h2>
+              </div>
+            </div>
+            <div class="body-weight-history" id="bodyWeightHistory"></div>
+            <div class="empty-state" id="bodyWeightEmpty">
+              <div class="empty-illustration" aria-hidden="true">◇</div>
+              <p>还没有体重记录</p>
+              <span>先记录今天早上或晚上的体重吧</span>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="weightChartView" data-view="weightChart">
+          <button class="back-button" id="closeWeightChartButton" type="button">‹ 返回体重记录</button>
+          <div class="page-heading chart-page-heading">
+            <p class="eyebrow">近 7 天 + 未来 7 天</p>
+            <h2>体重曲线</h2>
+            <p>实线是最近的早晚实际体重，虚线从预估起始日延伸到未来一周。</p>
+          </div>
+          <article class="weight-chart-card">
+            <div class="chart-legend" aria-label="体重曲线图例">
+              <span><i class="morning-line"></i>早上</span>
+              <span><i class="evening-line"></i>晚上</span>
+              <span><i class="forecast-line"></i>固定预估</span>
+            </div>
+            <div class="weight-chart-scroll">
+              <svg id="weightChart" viewBox="0 0 360 250" role="img" aria-label="最近14天体重曲线"></svg>
+            </div>
+            <div class="chart-empty hidden" id="weightChartEmpty">记录体重或设置固定预估后，这里会出现曲线。</div>
+          </article>
+          <div class="chart-summary" id="weightChartSummary"></div>
+        </section>
+
         <section class="view" id="settingsView" data-view="settings">
           <div class="page-heading">
             <p class="eyebrow">按你的节奏</p>
@@ -279,7 +407,7 @@
           <article class="settings-card">
             <div class="privacy-heading">
               <span class="privacy-icon">⌁</span>
-              <div><h3>数据只在本机</h3><p>饮食记录保存在这个浏览器里，不会上传到网站服务器。</p></div>
+              <div><h3>数据只在本机</h3><p>饮食和体重记录保存在这个浏览器里，不会上传到网站服务器。</p></div>
             </div>
             <div class="data-actions">
               <button class="secondary-button" id="exportButton" type="button">导出备份</button>
@@ -315,6 +443,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18l5-5 3 3 7-9M4 20h16" /></svg>
           <span>记录</span>
         </button>
+        <button class="nav-button" type="button" data-target="weight">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14l1 14H4L5 6zm4 5a3 3 0 0 1 6 0m-3-3v3" /></svg>
+          <span>体重</span>
+        </button>
         <button class="nav-button" type="button" data-target="settings">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0-5v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4" /></svg>
           <span>设置</span>
@@ -323,6 +455,6 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js?v=14" defer></script>
+    <script src="./app.js?v=17" defer></script>
   </body>
 </html>

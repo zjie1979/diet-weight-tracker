@@ -16,6 +16,7 @@
     snack: { label: "加餐", symbol: "＋" }
   };
   const MEAL_ORDER = ["breakfast", "lunch", "dinner", "snack"];
+  const FORECAST_DAILY_LOSS = 0.4;
   const SOFT_KEYWORDS = ["酸奶", "酸乳", "发酵乳", "粥", "稀饭", "米糊", "芝麻糊", "藕粉"];
   const LIQUID_KEYWORDS = ["牛奶", "豆浆", "果汁", "蔬菜汁", "咖啡", "奶茶", "饮料", "饮品", "可乐", "气泡水", "矿泉水"];
   const PRODUCE_KEYWORDS = [
@@ -43,6 +44,7 @@
   let state = loadState();
   let currentDate = todayString();
   let planDate = todayString();
+  let weightDate = todayString();
   let selectedType = "solid";
   let selectedMeal = defaultMealForTime();
   let selectedPlanMeal = defaultMealForTime();
@@ -52,7 +54,7 @@
   let toastTimer = null;
 
   function loadState() {
-    const fallback = { limit: 650, records: [], plans: [] };
+    const fallback = { limit: 650, records: [], plans: [], weightLogs: [], weightForecast: null };
     try {
       const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
       if (!parsed || !Array.isArray(parsed.records)) return fallback;
@@ -96,7 +98,9 @@
               completedAt: plan.completed && Number(plan.completedAt) ? Number(plan.completedAt) : null,
               createdAt: Number(plan.createdAt) || Date.now()
             };
-          })
+          }),
+        weightLogs: normalizeWeightLogs(parsed.weightLogs),
+        weightForecast: normalizeWeightForecast(parsed.weightForecast)
       };
     } catch {
       return fallback;
@@ -105,6 +109,35 @@
 
   function saveState() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function normalizeBodyWeight(value) {
+    const weight = Number(value);
+    return Number.isFinite(weight) && weight >= 30 && weight <= 600 ? roundWeight(weight) : null;
+  }
+
+  function normalizeWeightLogs(logs) {
+    const byDate = new Map();
+    (Array.isArray(logs) ? logs : []).forEach((log) => {
+      if (!log || !/^\d{4}-\d{2}-\d{2}$/.test(log.date)) return;
+      const morning = normalizeBodyWeight(log.morning);
+      const evening = normalizeBodyWeight(log.evening);
+      if (morning === null && evening === null) return;
+      byDate.set(log.date, {
+        date: log.date,
+        morning,
+        evening,
+        updatedAt: Number(log.updatedAt) || Date.now()
+      });
+    });
+    return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  function normalizeWeightForecast(forecast) {
+    if (!forecast || !/^\d{4}-\d{2}-\d{2}$/.test(forecast.startDate)) return null;
+    const startWeight = normalizeBodyWeight(forecast.startWeight);
+    if (startWeight === null || forecast.startDate > todayString()) return null;
+    return { startWeight, startDate: forecast.startDate };
   }
 
   function netWeight(record) {
@@ -157,6 +190,38 @@
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   }
 
+  function addDays(dateString, offset) {
+    const date = parseDate(dateString);
+    date.setDate(date.getDate() + offset);
+    return toDateString(date);
+  }
+
+  function daysBetween(fromDate, toDate) {
+    const from = Date.UTC(...fromDate.split("-").map(Number).map((value, index) => index === 1 ? value - 1 : value));
+    const to = Date.UTC(...toDate.split("-").map(Number).map((value, index) => index === 1 ? value - 1 : value));
+    return Math.round((to - from) / 86400000);
+  }
+
+  function forecastWeightFor(dateString) {
+    if (!state.weightForecast) return null;
+    const days = daysBetween(state.weightForecast.startDate, dateString);
+    if (days < 0) return null;
+    const forecast = roundWeight(state.weightForecast.startWeight - days * FORECAST_DAILY_LOSS);
+    return forecast > 0 ? forecast : null;
+  }
+
+  function bodyWeightRecordFor(dateString) {
+    return state.weightLogs.find((record) => record.date === dateString) || null;
+  }
+
+  function formatSignedWeight(value) {
+    if (!Number.isFinite(value)) return "--";
+    const formatted = formatWeight(Math.abs(value));
+    if (value > 0) return `+${formatted}`;
+    if (value < 0) return `-${formatted}`;
+    return "0";
+  }
+
   function defaultMealForTime() {
     const hour = new Date().getHours();
     if (hour < 10) return "breakfast";
@@ -172,6 +237,7 @@
     renderRecords();
     renderHistory();
     renderPlans();
+    renderBodyWeight();
     updatePlanTypePreview();
     el("dailyLimit").value = String(state.limit);
   }
@@ -190,6 +256,136 @@
     el("planDatePrimary").textContent = label.primary;
     el("planDateSecondary").textContent = label.secondary;
     el("planDateInput").value = planDate;
+  }
+
+  function renderBodyWeightDate() {
+    const label = formatDateHeading(weightDate);
+    el("weightDatePrimary").textContent = label.primary;
+    el("weightDateSecondary").textContent = label.secondary;
+    el("weightDateInput").value = weightDate;
+    el("weightDateInput").max = todayString();
+    el("weightNextDayButton").disabled = weightDate >= todayString();
+  }
+
+  function renderBodyWeight() {
+    renderBodyWeightDate();
+    const record = bodyWeightRecordFor(weightDate);
+    const morning = record ? record.morning : null;
+    const evening = record ? record.evening : null;
+    const difference = morning !== null && evening !== null ? roundWeight(evening - morning) : null;
+
+    el("morningWeightSummary").textContent = morning === null ? "--" : formatWeight(morning);
+    el("eveningWeightSummary").textContent = evening === null ? "--" : formatWeight(evening);
+    el("weightDifferenceSummary").textContent = difference === null ? "--" : formatSignedWeight(difference);
+    el("weightDifferenceBox").classList.toggle("rise", difference !== null && difference > 0);
+    el("weightDifferenceBox").classList.toggle("fall", difference !== null && difference < 0);
+    el("morningBodyWeight").value = morning === null ? "" : String(morning);
+    el("eveningBodyWeight").value = evening === null ? "" : String(evening);
+    el("deleteBodyWeightButton").classList.toggle("hidden", !record);
+    el("bodyWeightMessage").textContent = "";
+    updateBodyWeightPreview();
+
+    el("forecastStartDate").max = todayString();
+    el("forecastStartDate").value = state.weightForecast ? state.weightForecast.startDate : todayString();
+    el("forecastStartWeight").value = state.weightForecast ? String(state.weightForecast.startWeight) : "";
+    const todayForecast = forecastWeightFor(todayString());
+    const weekForecast = forecastWeightFor(addDays(todayString(), 7));
+    el("todayForecastWeight").textContent = todayForecast === null ? "--" : formatWeight(todayForecast);
+    el("weekForecastWeight").textContent = weekForecast === null ? "--" : formatWeight(weekForecast);
+    el("forecastMessage").textContent = state.weightForecast
+      ? `固定从 ${state.weightForecast.startDate} 的 ${formatWeight(state.weightForecast.startWeight)} 斤开始计算。`
+      : "请设置起始体重和日期。";
+
+    const recentLogs = [...state.weightLogs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 14);
+    el("bodyWeightEmpty").classList.toggle("hidden", recentLogs.length > 0);
+    el("bodyWeightHistory").innerHTML = recentLogs.map((item) => {
+      const heading = formatDateHeading(item.date);
+      const itemDifference = item.morning !== null && item.evening !== null ? roundWeight(item.evening - item.morning) : null;
+      return `
+        <button class="body-weight-history-item" type="button" data-weight-date="${item.date}">
+          <span class="body-weight-history-date"><strong>${heading.primary}</strong><small>${heading.secondary}</small></span>
+          <span><small>早上</small><strong>${item.morning === null ? "--" : formatWeight(item.morning)}</strong></span>
+          <span><small>晚上</small><strong>${item.evening === null ? "--" : formatWeight(item.evening)}</strong></span>
+          <span class="body-weight-history-diff"><small>早晚差</small><strong>${itemDifference === null ? "--" : formatSignedWeight(itemDifference)}</strong></span>
+        </button>`;
+    }).join("");
+  }
+
+  function updateBodyWeightPreview() {
+    const morning = normalizeBodyWeight(el("morningBodyWeight").value);
+    const evening = normalizeBodyWeight(el("eveningBodyWeight").value);
+    if (morning === null || evening === null) {
+      el("bodyWeightPreview").textContent = "早晚至少填写一个，另一个可以之后补录。";
+      return;
+    }
+    const difference = roundWeight(evening - morning);
+    const direction = difference > 0 ? "晚上比早上重" : difference < 0 ? "晚上比早上轻" : "早晚体重相同";
+    el("bodyWeightPreview").textContent = difference === 0
+      ? direction
+      : `${direction} ${formatWeight(Math.abs(difference))} 斤`;
+  }
+
+  function renderWeightChart() {
+    const dates = Array.from({ length: 14 }, (_, index) => addDays(todayString(), index - 6));
+    const morningPoints = [];
+    const eveningPoints = [];
+    const forecastPoints = [];
+    dates.forEach((date, index) => {
+      const record = bodyWeightRecordFor(date);
+      if (record && record.morning !== null) morningPoints.push({ index, value: record.morning });
+      if (record && record.evening !== null) eveningPoints.push({ index, value: record.evening });
+      const forecast = forecastWeightFor(date);
+      if (forecast !== null) forecastPoints.push({ index, value: forecast });
+    });
+    const values = [...morningPoints, ...eveningPoints, ...forecastPoints].map((point) => point.value);
+    const hasData = values.length > 0;
+    el("weightChart").classList.toggle("hidden", !hasData);
+    el("weightChartEmpty").classList.toggle("hidden", hasData);
+    if (!hasData) {
+      el("weightChart").innerHTML = "";
+      el("weightChartSummary").innerHTML = "";
+      return;
+    }
+
+    let minValue = Math.floor((Math.min(...values) - 0.8) * 10) / 10;
+    let maxValue = Math.ceil((Math.max(...values) + 0.8) * 10) / 10;
+    if (maxValue - minValue < 2) {
+      const center = (maxValue + minValue) / 2;
+      minValue = center - 1;
+      maxValue = center + 1;
+    }
+    const left = 39;
+    const right = 344;
+    const top = 21;
+    const bottom = 214;
+    const xFor = (index) => left + (index / 13) * (right - left);
+    const yFor = (value) => bottom - ((value - minValue) / (maxValue - minValue)) * (bottom - top);
+    const pathFor = (points) => points.map((point, index) => `${index ? "L" : "M"}${xFor(point.index).toFixed(1)},${yFor(point.value).toFixed(1)}`).join(" ");
+    const circlesFor = (points, className) => points.map((point) => `<circle class="${className}" cx="${xFor(point.index).toFixed(1)}" cy="${yFor(point.value).toFixed(1)}" r="3.2"><title>${dates[point.index]} ${formatWeight(point.value)}斤</title></circle>`).join("");
+    const grid = Array.from({ length: 4 }, (_, index) => {
+      const ratio = index / 3;
+      const y = top + ratio * (bottom - top);
+      const value = maxValue - ratio * (maxValue - minValue);
+      return `<line class="chart-grid-line" x1="${left}" y1="${y.toFixed(1)}" x2="${right}" y2="${y.toFixed(1)}"></line><text class="chart-axis-label" x="3" y="${(y + 4).toFixed(1)}">${formatWeight(value)}</text>`;
+    }).join("");
+    const labelIndexes = [0, 6, 13];
+    const dateLabels = labelIndexes.map((index) => {
+      const date = parseDate(dates[index]);
+      return `<text class="chart-date-label" x="${xFor(index).toFixed(1)}" y="238" text-anchor="middle">${date.getMonth() + 1}/${date.getDate()}</text>`;
+    }).join("");
+    el("weightChart").innerHTML = `
+      ${grid}
+      ${dateLabels}
+      ${forecastPoints.length ? `<path class="chart-path forecast-path" d="${pathFor(forecastPoints)}"></path>` : ""}
+      ${morningPoints.length ? `<path class="chart-path morning-path" d="${pathFor(morningPoints)}"></path>${circlesFor(morningPoints, "morning-point")}` : ""}
+      ${eveningPoints.length ? `<path class="chart-path evening-path" d="${pathFor(eveningPoints)}"></path>${circlesFor(eveningPoints, "evening-point")}` : ""}`;
+    el("weightChart").setAttribute("aria-label", `${dates[0]} 到 ${dates[13]} 的早晚体重和固定预估曲线`);
+
+    const latest = [...state.weightLogs].filter((item) => item.date <= todayString()).sort((a, b) => b.date.localeCompare(a.date))[0] || null;
+    const latestValue = latest ? (latest.evening !== null ? latest.evening : latest.morning) : null;
+    el("weightChartSummary").innerHTML = `
+      <div><span>最近实际体重</span><strong>${latestValue === null ? "--" : formatWeight(latestValue)} 斤</strong><small>${latest ? latest.date : "暂无记录"}</small></div>
+      <div><span>今天固定预估</span><strong>${forecastWeightFor(todayString()) === null ? "--" : formatWeight(forecastWeightFor(todayString()))} 斤</strong><small>每天 −0.4 斤</small></div>`;
   }
 
   function renderProgress() {
@@ -593,14 +789,84 @@
     renderPlans();
   }
 
+  function changeWeightDate(offset) {
+    const nextDate = addDays(weightDate, offset);
+    if (nextDate > todayString()) return;
+    weightDate = nextDate;
+    renderBodyWeight();
+  }
+
+  function saveBodyWeight(event) {
+    event.preventDefault();
+    const morningInput = el("morningBodyWeight").value.trim();
+    const eveningInput = el("eveningBodyWeight").value.trim();
+    const morning = morningInput ? normalizeBodyWeight(morningInput) : null;
+    const evening = eveningInput ? normalizeBodyWeight(eveningInput) : null;
+    if (!morningInput && !eveningInput) {
+      el("bodyWeightMessage").textContent = "早上或晚上体重至少填写一个。";
+      return;
+    }
+    if ((morningInput && morning === null) || (eveningInput && evening === null)) {
+      el("bodyWeightMessage").textContent = "体重请输入 30 到 600 斤之间的数字。";
+      return;
+    }
+    const existing = bodyWeightRecordFor(weightDate);
+    if (existing) {
+      existing.morning = morning;
+      existing.evening = evening;
+      existing.updatedAt = Date.now();
+    } else {
+      state.weightLogs.push({ date: weightDate, morning, evening, updatedAt: Date.now() });
+    }
+    state.weightLogs.sort((a, b) => a.date.localeCompare(b.date));
+    saveState();
+    renderBodyWeight();
+    renderWeightChart();
+    showToast("当天体重已保存");
+  }
+
+  function deleteBodyWeight() {
+    const record = bodyWeightRecordFor(weightDate);
+    if (!record) return;
+    if (!window.confirm(`确定删除 ${weightDate} 的早晚体重吗？`)) return;
+    state.weightLogs = state.weightLogs.filter((item) => item.date !== weightDate);
+    saveState();
+    renderBodyWeight();
+    renderWeightChart();
+    showToast("当天体重已删除");
+  }
+
+  function saveWeightForecast() {
+    const startWeight = normalizeBodyWeight(el("forecastStartWeight").value);
+    const startDate = el("forecastStartDate").value;
+    if (startWeight === null) {
+      el("forecastMessage").textContent = "预估起始体重请输入 30 到 600 斤之间的数字。";
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || startDate > todayString()) {
+      el("forecastMessage").textContent = "请选择今天或更早的起始日期。";
+      return;
+    }
+    state.weightForecast = { startWeight, startDate };
+    saveState();
+    renderBodyWeight();
+    renderWeightChart();
+    showToast("固定体重预估已保存");
+  }
+
   function switchView(target) {
     document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.dataset.view === target));
-    document.querySelectorAll(".nav-button").forEach((button) => button.classList.toggle("active", button.dataset.target === target));
+    document.querySelectorAll(".nav-button").forEach((button) => {
+      const isActive = button.dataset.target === target || (target === "weightChart" && button.dataset.target === "weight");
+      button.classList.toggle("active", isActive);
+    });
     if (target === "history") renderHistory();
     if (target === "plan") {
       renderPlanDate();
       renderPlans();
     }
+    if (target === "weight") renderBodyWeight();
+    if (target === "weightChart") renderWeightChart();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -618,7 +884,7 @@
   }
 
   function exportData() {
-    const payload = { app: "饮食重量记录", version: 11, exportedAt: new Date().toISOString(), data: state };
+    const payload = { app: "饮食重量记录", version: 12, exportedAt: new Date().toISOString(), data: state };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -643,6 +909,7 @@
       state = loadState();
       currentDate = todayString();
       planDate = todayString();
+      weightDate = todayString();
       resetForm();
       renderAll();
       showToast("备份已导入");
@@ -654,9 +921,11 @@
   }
 
   function clearData() {
-    if (!window.confirm("确定清空全部饮食记录和饮食计划吗？此操作无法撤销，建议先导出备份。")) return;
+    if (!window.confirm("确定清空全部饮食记录、饮食计划和体重数据吗？此操作无法撤销，建议先导出备份。")) return;
     state.records = [];
     state.plans = [];
+    state.weightLogs = [];
+    state.weightForecast = null;
     el("planForm").reset();
     updatePlanTypePreview();
     saveState();
@@ -735,6 +1004,32 @@
         renderPlanDate();
         renderPlans();
       }
+    });
+    el("weightPreviousDayButton").addEventListener("click", () => changeWeightDate(-1));
+    el("weightNextDayButton").addEventListener("click", () => changeWeightDate(1));
+    el("weightDateButton").addEventListener("click", () => {
+      if (typeof el("weightDateInput").showPicker === "function") el("weightDateInput").showPicker();
+      else el("weightDateInput").click();
+    });
+    el("weightDateInput").addEventListener("change", (event) => {
+      if (event.target.value && event.target.value <= todayString()) {
+        weightDate = event.target.value;
+        renderBodyWeight();
+      }
+    });
+    el("morningBodyWeight").addEventListener("input", updateBodyWeightPreview);
+    el("eveningBodyWeight").addEventListener("input", updateBodyWeightPreview);
+    el("bodyWeightForm").addEventListener("submit", saveBodyWeight);
+    el("deleteBodyWeightButton").addEventListener("click", deleteBodyWeight);
+    el("saveForecastButton").addEventListener("click", saveWeightForecast);
+    el("openWeightChartButton").addEventListener("click", () => switchView("weightChart"));
+    el("closeWeightChartButton").addEventListener("click", () => switchView("weight"));
+    el("bodyWeightHistory").addEventListener("click", (event) => {
+      const item = event.target.closest("[data-weight-date]");
+      if (!item) return;
+      weightDate = item.dataset.weightDate;
+      renderBodyWeight();
+      window.scrollTo({ top: 0, behavior: "smooth" });
     });
     document.querySelectorAll(".nav-button").forEach((button) => button.addEventListener("click", () => switchView(button.dataset.target)));
     el("historyList").addEventListener("click", (event) => {
